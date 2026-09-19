@@ -37,6 +37,9 @@ often a one-node experiment.
 
 ## Docker
 
+The image builds the Next.js interface in a node stage and copies the static
+export into the Python image, so nothing but uvicorn runs at runtime.
+
 ```bash
 docker build -t arborist .
 docker run --rm -p 8000:8000 \

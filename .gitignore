@@ -14,3 +14,9 @@ runs/
 # Private working notes — submission material, scripts, strategy. Never committed.
 .private/
 private/
+
+# Next.js UI
+web/node_modules/
+web/out/
+web/.next/
+web/next-env.d.ts

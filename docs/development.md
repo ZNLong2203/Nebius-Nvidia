@@ -53,6 +53,17 @@ The test worth reading first is `test_search.py::test_search_repairs_every_bug_b
 It asserts the agent reaches depth 3, that scores increase monotonically along the
 winning path, and that the diff never touches `tests/`.
 
+## The web interface
+
+```bash
+cd web && npm install && npm run build   # static export into web/out/
+```
+
+`arborist serve` then serves that export at `/`. Without it the service falls
+back to `ui/index.html`, which is one file with no build step — so a fresh clone
+always works. For UI work, `npm run dev` on :3000 proxies the API to :8000 and
+gives hot reload. See [`web/README.md`](../web/README.md).
+
 ## Running against the real services
 
 ```bash

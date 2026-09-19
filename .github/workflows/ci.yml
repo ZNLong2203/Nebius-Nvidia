@@ -16,6 +16,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -30,6 +34,13 @@ jobs:
         # No network and no credentials: a scripted model stands in for Nemotron
         # and directory snapshots for Nebius Sandboxes.
         run: pytest -q
+
+      - name: Build the web UI
+        if: matrix.python-version == '3.12'
+        working-directory: web
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
 
       - name: The bundled example really is broken
         run: |

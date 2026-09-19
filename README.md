@@ -122,10 +122,13 @@ You get a live tree in the terminal, then the winning diff, the token spend per 
 ### Watch it search
 
 ```bash
-arborist serve      # http://127.0.0.1:8000
+cd web && npm install && npm run build && cd ..   # optional: the full interface
+arborist serve                                     # http://127.0.0.1:8000
 ```
 
-The tree draws itself over server-sent events while the search runs: branches open, score, and get abandoned in real time. Click any node for its hypothesis, its patch, which tests it fixed, and which it broke.
+The tree draws itself over server-sent events while the search runs: branches open, score, and get abandoned in real time. Click any node for its hypothesis, its patch, which tests it fixed, and which it broke. Starting a run puts `?run=<id>` in the URL, and that link replays the whole search for anyone you send it to.
+
+Without the build step the service serves [`ui/index.html`](ui/index.html) instead — one file, no dependencies, same API — so a fresh clone works immediately.
 
 ### Open it as a pull request
 
@@ -184,7 +187,8 @@ arborist/
   tools/tavily.py external-knowledge lookup
   server.py       HTTP API + SSE event stream
   cli.py          terminal interface
-ui/index.html     the live tree (no build step, no CDN)
+web/              the interface: Next.js, exported to static files
+ui/index.html     dependency-free fallback UI (no build step, no CDN)
 ```
 
 The loop, once per iteration:

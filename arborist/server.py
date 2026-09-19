@@ -17,6 +17,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .config import load_settings
@@ -26,7 +27,9 @@ from .sandbox import build_backend
 from .search import Arborist, RunConfig, write_report
 from .tools.tavily import TavilyClient
 
-UI_DIR = Path(__file__).resolve().parents[1] / "ui"
+ROOT = Path(__file__).resolve().parents[1]
+UI_DIR = ROOT / "ui"
+WEB_DIR = ROOT / "web" / "out"
 
 app = FastAPI(title="Arborist", version="0.1.0")
 
@@ -266,4 +269,16 @@ def health() -> dict:
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(UI_DIR / "index.html")
+    """Serve the built Next.js UI, falling back to the dependency-free one.
+
+    The polished interface needs `npm run build` in `web/`. Someone who has
+    cloned the repository and only wants to see it work gets `ui/index.html`
+    instead: one file, no build step, same API.
+    """
+    built = WEB_DIR / "index.html"
+    return FileResponse(built if built.is_file() else UI_DIR / "index.html")
+
+
+if (WEB_DIR / "_next").is_dir():
+    # Mounted only when the export exists, so an unbuilt checkout still starts.
+    app.mount("/_next", StaticFiles(directory=WEB_DIR / "_next"), name="next-assets")

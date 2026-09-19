@@ -1,0 +1,53 @@
+[
+  {
+    "case": "broken-invoice",
+    "models": "matched-baseline",
+    "branching": true,
+    "solved": true,
+    "baseline_passing": "5/9",
+    "final_passing": "9/9",
+    "patches": 8,
+    "sandbox_runs": 10,
+    "setup_runs": 1,
+    "invalid_patches": 0,
+    "wall_seconds": 66.7,
+    "tokens_nano": 23078,
+    "tokens_super": 20171,
+    "tokens_ultra": 0,
+    "error": ""
+  },
+  {
+    "case": "regression-trap",
+    "models": "matched-baseline",
+    "branching": true,
+    "solved": true,
+    "baseline_passing": "3/5",
+    "final_passing": "5/5",
+    "patches": 3,
+    "sandbox_runs": 4,
+    "setup_runs": 1,
+    "invalid_patches": 1,
+    "wall_seconds": 33.2,
+    "tokens_nano": 8282,
+    "tokens_super": 2688,
+    "tokens_ultra": 0,
+    "error": ""
+  },
+  {
+    "case": "outside-knowledge",
+    "models": "matched-baseline",
+    "branching": true,
+    "solved": true,
+    "baseline_passing": "0/1",
+    "final_passing": "4/4",
+    "patches": 3,
+    "sandbox_runs": 5,
+    "setup_runs": 1,
+    "invalid_patches": 0,
+    "wall_seconds": 29.0,
+    "tokens_nano": 7967,
+    "tokens_super": 5859,
+    "tokens_ultra": 0,
+    "error": ""
+  }
+]

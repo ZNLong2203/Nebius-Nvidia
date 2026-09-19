@@ -192,8 +192,12 @@ class Arborist:
         if report.collection_error or report.total == 0:
             return 0.0, [], []
         if report.green:
+            # Regressions are computed even here. A suite can report no failures
+            # because the failing tests were skipped or deleted, and returning an
+            # empty list would hide exactly that.
             fixed = sorted(report.passed_ids - parent.passed_ids) if parent else sorted(report.passed_ids)
-            return 1.0, fixed, []
+            regressions = sorted(parent.passed_ids - report.passed_ids) if parent else []
+            return (1.0 if not regressions else 0.0), fixed, regressions
 
         rate = report.passed / max(report.total, 1)
         if parent is None:
@@ -212,7 +216,11 @@ class Arborist:
         files: dict[str, bytes] | None = None,
         prefix: str = "",
     ) -> tuple[Checkpoint, TestReport | None, str, str, float]:
-        command = cfg.instrumented_test_command
+        # Remove the inherited report first. A fork carries the parent's
+        # filesystem, junit file included, so a branch whose test command dies
+        # before writing one would otherwise be scored with its parent's
+        # results -- passing tests it never ran.
+        command = f"rm -f {JUNIT_PATH} ; {cfg.instrumented_test_command}"
         if prefix:
             command = f"{prefix} ; {command}"
         result = self.backend.run(checkpoint, command, files=files)
@@ -319,6 +327,10 @@ class Arborist:
             error = f"{type(exc).__name__}: {exc}"
             self._emit("error", message=error)
 
+        best_id = max(
+            self._states,
+            key=lambda nid: (self._states[nid].node.score, nid == best_id),
+        )
         winner = self._states[best_id].node
         if winner.id == root.id:
             winner_node = None
@@ -530,8 +542,14 @@ class Arborist:
         if report is None:
             node.status = "invalid"
             node.note = stderr[:300] or "sandbox execution failed"
-        elif report.green:
+        elif report.green and not regressions:
             node.status = "green"
+        elif report.green:
+            # Nothing fails, but tests that passed at the parent no longer do --
+            # they were skipped or deselected. A suite satisfied by removing the
+            # failing tests is not a repair, and green here would end the run.
+            node.status = "regressed"
+            node.note = "suite reports no failures, but tests that used to pass no longer run"
         elif regressions:
             node.status = "regressed"
         elif score > parent.node.score + TIE_EPSILON:

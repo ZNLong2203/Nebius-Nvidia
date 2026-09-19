@@ -1,13 +1,13 @@
 # Eval results
 
-backend: `local` · fanout: 3 · node cap: 10
+backend: `local` · fanout: 3 · node cap: 12 · models: `nemotron` (nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B, nvidia/nemotron-3-super-120b-a12b, nvidia/Nemotron-3-Ultra-550b-a55b)
 
-| case | branching | solved | baseline | final | patches | sandbox runs | setup runs | invalid | wall (s) | nano tok | super tok | ultra tok |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| broken-invoice | on | no | 5/9 | 8/9 | 8 | 7 | 1 | 3 | 249.0 | 43,772 | 39,276 | 0 |
-| broken-invoice | off | no | 5/9 | 6/9 | 2 | 4 | 2 | 0 | 93.7 | 11,679 | 15,416 | 0 |
-| regression-trap | on | yes | 3/5 | 5/5 | 3 | 5 | 1 | 0 | 58.9 | 9,453 | 7,808 | 0 |
-| regression-trap | off | yes | 3/5 | 5/5 | 1 | 3 | 1 | 0 | 50.9 | 4,957 | 4,576 | 0 |
-| outside-knowledge | on | yes | 0/1 | 4/4 | 3 | 5 | 1 | 0 | 70.5 | 9,392 | 9,712 | 0 |
-| outside-knowledge | off | yes | 0/1 | 4/4 | 2 | 4 | 2 | 0 | 70.4 | 7,284 | 6,824 | 0 |
+| case | models | branching | solved | baseline | final | patches | sandbox runs | setup runs | invalid | wall (s) | nano tok | super tok | ultra tok |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| broken-invoice | nemotron | on | yes | 5/9 | 9/9 | 8 | 9 | 1 | 1 | 277.6 | 71,616 | 23,406 | 0 |
+| broken-invoice | nemotron | off | no | 5/9 | 6/9 | 2 | 4 | 2 | 0 | 97.4 | 9,576 | 18,746 | 0 |
+| regression-trap | nemotron | on | no | 3/5 | - | 2 | 2 | 1 | 2 | 159.0 | 30,704 | 10,645 | 0 |
+| regression-trap | nemotron | off | yes | 3/5 | 5/5 | 1 | 3 | 1 | 0 | 52.9 | 5,250 | 4,248 | 0 |
+| outside-knowledge | nemotron | on | yes | 0/1 | 4/4 | 1 | 3 | 1 | 0 | 65.9 | 5,354 | 9,443 | 0 |
+| outside-knowledge | nemotron | off | yes | 0/1 | 4/4 | 1 | 3 | 1 | 0 | 1362.4 | 5,373 | 11,650 | 0 |
 

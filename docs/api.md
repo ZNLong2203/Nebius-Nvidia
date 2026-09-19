@@ -135,7 +135,7 @@ corrupt report is skipped rather than taking the endpoint down.
 ```json
 { "ok": true, "llm_configured": true, "tavily_configured": false,
   "can_run": true, "saved_runs": 3, "backend": "contree",
-  "models": { "nano": "nvidia/nemotron-3-nano-30b-a3b", … } }
+  "models": { "nano": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B", … } }
 ```
 
 Reports whether keys are present. It never reveals them. `can_run` is what the UI

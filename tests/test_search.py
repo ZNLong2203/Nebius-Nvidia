@@ -369,3 +369,66 @@ def test_a_green_repo_is_left_alone(backend, tmp_path):
     assert result.solved
     assert result.diff == ""
     assert llm.calls == [], "a passing suite must not cost a single model call"
+
+
+def test_a_suite_satisfied_by_skipping_the_failures_is_not_a_solve(backend):
+    """Nothing fails, but the failing tests no longer run. That is not a repair."""
+    skip_all = (
+        "import pytest\n\n"
+        "@pytest.mark.skip(reason='nope')\n"
+        "def test_round_money_rounds_half_away_from_zero():\n    assert False\n"
+    )
+    llm = ScriptedLLM(
+        responses={
+            "super": [_diagnosis("just skip them", "tests/test_billing.py")],
+            "nano": [
+                {
+                    "explanation": "skip everything",
+                    "edits": [{"path": "tests/test_billing.py", "new_content": skip_all}],
+                }
+            ],
+        }
+    )
+    settings = load_settings(backend="local", fanout=1, max_nodes=2, max_depth=2)
+    result = Arborist(settings, backend, llm).run(
+        RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD)
+    )
+
+    child = next(n for n in result.nodes if n.depth == 1)
+    assert child.status == "regressed", "green here would end the run on a fake solve"
+    assert "no longer run" in child.note
+    assert not result.solved
+
+
+def test_a_branch_whose_tests_never_ran_is_not_scored_with_its_parents_report(backend):
+    """A fork carries the parent's junit file; a dead test command must not inherit it."""
+    llm = ScriptedLLM(
+        responses={
+            "super": [_diagnosis("break the runner", "src/billing/money.py")],
+            "nano": [
+                {
+                    "explanation": "leave the file valid but make the command die",
+                    "edits": [{"path": "src/billing/money.py", "new_content": MONEY_FIXED}],
+                }
+            ],
+        }
+    )
+    settings = load_settings(backend="local", fanout=1, max_nodes=2, max_depth=2)
+    agent = Arborist(settings, backend, llm)
+    # The second test command is one that cannot produce a report at all.
+    original = agent._run_tests
+    calls = {"n": 0}
+
+    def flaky(checkpoint, cfg, files=None, prefix=""):
+        calls["n"] += 1
+        if calls["n"] > 1:
+            cfg = RunConfig(repo_path=cfg.repo_path, test_command="exit 1")
+        return original(checkpoint, cfg, files=files, prefix=prefix)
+
+    agent._run_tests = flaky
+    result = agent.run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
+
+    child = next(n for n in result.nodes if n.depth == 1)
+    assert child.report is None or child.report.total == 0, (
+        "the parent's passing tests must not be credited to a branch that never ran them"
+    )

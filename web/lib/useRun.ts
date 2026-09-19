@@ -193,7 +193,10 @@ export function useRun() {
         running: true,
       }));
       try {
-        const runId = await startRun(request);
+        const runId = await startRun(request)
+        // Without this, Stop has no run id to cancel and falls back to merely
+        // closing the stream -- which is the bug it was meant to fix.
+        runIdRef.current = runId
         // Make the run linkable without reloading the page.
         const url = new URL(window.location.href);
         url.searchParams.set("run", runId);

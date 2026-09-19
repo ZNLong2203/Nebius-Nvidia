@@ -187,11 +187,18 @@ def render_pr_body(report: dict, *, repo_url: str = "") -> str:
     out.append("")
     evaluated = stats.get("patches_evaluated", 0)
     depth = max((n["depth"] for n in report.get("nodes", [])), default=0)
+    # Name the backend the run actually used. Claiming Nebius Sandboxes on a
+    # run that used directory snapshots would be false in every pull request
+    # the tool opens.
+    where = (
+        "[Nebius Sandboxes](https://docs.tokenfactory.nebius.com/sandboxes/overview)"
+        if stats.get("backend") == "contree"
+        else "a local snapshot backend"
+    )
     out.append(
         f"Searched **{evaluated} candidate patches** across **{depth} levels**, "
         f"each one applied to its own fork of a single prepared checkpoint on "
-        f"[Nebius Sandboxes](https://docs.tokenfactory.nebius.com/sandboxes/overview) "
-        f"and scored by the test suite."
+        f"{where} and scored by the test suite."
     )
     if stats.get("setup_seconds_saved"):
         out.append("")

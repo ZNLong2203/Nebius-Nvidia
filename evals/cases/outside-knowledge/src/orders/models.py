@@ -1,7 +1,7 @@
 """Order models.
 
-Written against Pydantic 1.x. The pin in requirements.txt has since moved to
-2.x, and nothing in this repository records what changed.
+An order is a reference plus a list of lines, optionally with a discount. A line
+quantity must be positive, and a discount may not exceed the order total.
 """
 
 from pydantic import BaseModel, root_validator, validator

@@ -69,9 +69,9 @@ Three tiers, chosen by what each step is worth. This is the core cost argument, 
 
 | Tier | Model | Called | Why this tier |
 |---|---|---|---|
-| **Nano** | `nvidia/nemotron-3-nano-30b-a3b` | Once **per candidate patch** — the widest step in the whole system | Most branches are thrown away. The work that gets discarded must be the cheap work. |
+| **Nano** | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | Once **per candidate patch** — the widest step in the whole system | Most branches are thrown away. The work that gets discarded must be the cheap work. |
 | **Super** | `nvidia/nemotron-3-super-120b-a12b` | Once **per node**, to diagnose the failure and produce *distinct* hypotheses worth branching on | This is the reasoning that shapes the search. Getting hypotheses that genuinely differ is what makes breadth worth paying for. |
-| **Ultra** | `nvidia/nemotron-3-ultra-550b-a55b` | Only when the search **stalls** (two expansions with no improvement), or when two branches score **identically** | Expensive, so it is earned, not scheduled. |
+| **Ultra** | `nvidia/Nemotron-3-Ultra-550b-a55b` | Only when the search **stalls** (two expansions with no improvement), or when two branches score **identically** | Expensive, so it is earned, not scheduled. |
 
 The Ultra tie-break is the interesting one. When the tests cannot separate two branches, the suite has stopped being informative — and that is exactly the situation where one of the patches is *gaming* it. Ultra is asked specifically to catch a patch that passes by weakening an assertion, swallowing an exception, or special-casing the test input, and to flag it rather than let the score stand. See [`arborist/agent.py`](arborist/agent.py) (`ADJUDICATE_SYSTEM`).
 
@@ -239,7 +239,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 
 ### Two backends, one contract
 
-`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 109 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
+`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 131 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
 
 ---
 
@@ -249,7 +249,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 pytest -q
 ```
 
-109 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
+131 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
 
 ---
 

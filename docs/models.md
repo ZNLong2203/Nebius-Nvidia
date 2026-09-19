@@ -26,9 +26,9 @@ calls**. The tiering is not decorative — it is the cost argument:
 Change the mapping in one place, [`arborist/config.py`](../arborist/config.py):
 
 ```python
-MODEL_NANO  = "nvidia/nemotron-3-nano-30b-a3b"
+MODEL_NANO  = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
 MODEL_SUPER = "nvidia/nemotron-3-super-120b-a12b"
-MODEL_ULTRA = "nvidia/nemotron-3-ultra-550b-a55b"
+MODEL_ULTRA = "nvidia/Nemotron-3-Ultra-550b-a55b"
 ```
 
 ## When Ultra wakes up
@@ -142,9 +142,9 @@ cost claim checkable:
 
 ```
 tier    model                              calls   tokens
-nano    nvidia/nemotron-3-nano-30b-a3b        12   41,204
+nano    nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B        12   41,204
 super   nvidia/nemotron-3-super-120b-a12b      3   18,551
-ultra   nvidia/nemotron-3-ultra-550b-a55b      0        0
+ultra   nvidia/Nemotron-3-Ultra-550b-a55b      0        0
 ```
 
 ## Tavily

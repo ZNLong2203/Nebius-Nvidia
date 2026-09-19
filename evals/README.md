@@ -58,7 +58,8 @@ where the second fault is invisible until the first is repaired is open work.
 ### `outside-knowledge` — knowing when to look it up
 
 An order model written against Pydantic 1.x, in a project whose pin has moved to
-2.x. Nothing in the tree records what `@root_validator` and `@validator` became;
+2.x. (That framing lives here, not in the case: the module docstring used to say
+it, which handed the agent the answer.) Nothing in the tree records what `@root_validator` and `@validator` became;
 a repo-local agent can read every file and still not know. This is the class of
 failure the Tavily lookup exists for.
 

@@ -47,7 +47,19 @@ Nebius Sandboxes gives every executed command a new, immutable filesystem versio
 
 ## What it produces
 
-Not just a patch — **a patch plus the record of what was rejected and why**. The run report contains every branch that was explored, the tests each one fixed and broke, and the diff that was discarded. That is the thing a human reviewer actually wants and no coding agent gives them today.
+Not just a patch — **a patch plus the record of what was rejected and why**, opened as a pull request:
+
+```
+fix: round_money uses banker's rounding + 2 more (4 failing tests)
+
+Repairs the failing suite: 5/9 → 9/9 passing.
+
+## Alternatives considered (2)
+▸ → pct() loses precision before rounding — no test changed state
+▸ ✗ the test encodes the wrong expectation — tests/test_billing.py: search block not found
+```
+
+Every branch the search explored is in that body, folded away but present, with the test-level reason it lost. A reviewer can see that the agent *considered* weakening the assertion and why that attempt was thrown out. No coding agent ships that today, and it is the difference between trusting a diff and being able to check one.
 
 ---
 
@@ -115,6 +127,15 @@ arborist serve      # http://127.0.0.1:8000
 
 The tree draws itself over server-sent events while the search runs: branches open, score, and get abandoned in real time. Click any node for its hypothesis, its patch, which tests it fixed, and which it broke.
 
+### Open it as a pull request
+
+```bash
+arborist pr runs/run-xxxxxxxx.json --repo .          # dry run: prints the plan and the body
+arborist pr runs/run-xxxxxxxx.json --repo . --open   # branch, commit, push, gh pr create
+```
+
+Dry run by default. Creating a branch needs `--yes`; pushing and opening the pull request are separate opt-ins on top of that. `arborist report <run.json>` prints the same body without touching git.
+
 ### Compare against a linear agent
 
 ```bash
@@ -174,7 +195,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 
 ### Two backends, one contract
 
-`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 56 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
+`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 94 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
 
 ---
 
@@ -184,7 +205,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 pytest -q
 ```
 
-56 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
+94 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
 
 ---
 
@@ -196,7 +217,8 @@ Worth stating plainly:
 - **Search quality is bounded by hypothesis diversity.** If Super returns four rephrasings of one idea, breadth buys nothing. The prompt pushes hard against this and `parent_attempts` is fed back, but it is the real ceiling.
 - **The suite is the oracle.** A bug with no failing test is invisible, and a weak suite can be satisfied by a bad patch — which is why Ultra is asked to flag suite-gaming rather than trusting the score outright.
 - **Sandboxes is in Beta.** Occasional execution failures are handled as node-level outcomes, not crashes, but they do cost a branch.
-- **No PR opening yet.** The run report and diff are written to `runs/`; wiring them to a GitHub App is the obvious next step and is not built.
+- **Pull requests are opened from the CLI, not automatically.** `arborist pr` branches, commits, pushes and calls `gh`. There is no GitHub App and nothing watches CI for you — a failing build does not yet wake the agent up.
+- **The Dockerfile has not been built in CI.** It is straightforward and the service is stateless, but treat it as untested until it runs somewhere.
 
 ## Documentation
 
@@ -209,6 +231,7 @@ Worth stating plainly:
 | [docs/sandboxes.md](docs/sandboxes.md) | The Nebius Sandboxes integration and the backend contract |
 | [docs/api.md](docs/api.md) | HTTP endpoints and the SSE event stream |
 | [docs/development.md](docs/development.md) | Setup, tests, adding a backend or an eval case |
+| [docs/deploying.md](docs/deploying.md) | Running the demo, recorded runs, Docker, going public |
 
 ## License
 

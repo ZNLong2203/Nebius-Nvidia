@@ -13,6 +13,7 @@ order that makes sense if you are reading the code for the first time.
 | [sandboxes.md](sandboxes.md) | The Nebius Sandboxes integration and the backend contract |
 | [api.md](api.md) | HTTP endpoints and the event stream the UI consumes |
 | [development.md](development.md) | Setup, tests, adding a backend, adding an eval case |
+| [deploying.md](deploying.md) | Running the demo, recorded runs, Docker, going public |
 
 ## The one-paragraph version
 

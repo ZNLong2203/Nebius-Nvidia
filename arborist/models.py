@@ -102,6 +102,7 @@ class Node:
     depth: int
     checkpoint_id: str | None = None
     hypothesis: Hypothesis | None = None
+    diagnosis: str = ""
     edits: list[Edit] = field(default_factory=list)
     explanation: str = ""
     report: TestReport | None = None
@@ -123,6 +124,7 @@ class Node:
             "depth": self.depth,
             "checkpoint_id": self.checkpoint_id,
             "hypothesis": self.hypothesis.to_dict() if self.hypothesis else None,
+            "diagnosis": self.diagnosis,
             "edits": [e.to_dict() for e in self.edits],
             "explanation": self.explanation,
             "report": self.report.to_dict() if self.report else None,

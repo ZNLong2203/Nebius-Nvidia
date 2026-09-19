@@ -17,7 +17,7 @@ uv venv .venv -p 3.12 && uv pip install -e ".[contree,dev]"
 ## Tests
 
 ```bash
-pytest -q          # 56 tests, no network, no credentials
+pytest -q          # 94 tests, no network, no credentials
 ruff check .
 ```
 
@@ -40,6 +40,13 @@ regression detection, backtracking, the HTTP API and the CLI.
 | `tests/test_search.py` | Scoring, and an end-to-end repair of all three bugs in `examples/broken-invoice` at depth 3 |
 | `tests/test_server.py` | Endpoints, run lifecycle, event replay, failure reporting |
 | `tests/test_cli.py` | Exit codes, rendered output, report files |
+| `tests/test_report.py` | The pull request body: the fix, the evidence, the rejected alternatives and their reasons |
+| `tests/test_publish.py` | Branch, commit, push, `gh` — and the guard rails in front of each |
+
+`tests/conftest.py` builds `multi_branch_report` by running a **real search**
+with the scripted model: one branch that cannot be applied, one that changes
+nothing, and a three-deep chain that goes green. Rendering and publishing are
+tested against output the search actually produced, not hand-written JSON.
 
 The test worth reading first is `test_search.py::test_search_repairs_every_bug_by_deepening`.
 It asserts the agent reaches depth 3, that scores increase monotonically along the
@@ -64,6 +71,22 @@ Useful flags:
 | `--context, -c` | Files or globs always shown to the model |
 | `--out` | Where the run report is written (default `runs/`) |
 
+## Turning a run into a pull request
+
+```bash
+arborist report runs/run-xxxxxxxx.json              # the markdown a reviewer reads
+arborist report runs/run-xxxxxxxx.json --summary    # one line, for a CI comment
+
+arborist pr runs/run-xxxxxxxx.json --repo .         # dry run: the plan and the body
+arborist pr runs/run-xxxxxxxx.json --repo . --yes   # create the branch and commit
+arborist pr runs/run-xxxxxxxx.json --repo . --open  # …push and open the PR with gh
+```
+
+Every outward-facing step is a separate opt-in: `--yes` creates the branch,
+`--push` implies it, `--open` implies both. A dirty working tree or a patch that
+no longer applies aborts before anything is created, and a failure after the
+branch exists leaves the commit in place rather than unwinding it silently.
+
 ## Environment
 
 | Variable | Default | Meaning |
@@ -79,6 +102,8 @@ Useful flags:
 | `ARBORIST_MAX_NODES` | `24` | Sandbox evaluation cap |
 | `ARBORIST_MAX_DEPTH` | `4` | Tree depth cap |
 | `ARBORIST_TOKEN_BUDGET` | `1500000` | Total tokens across all tiers |
+| `ARBORIST_RUNS_DIR` | `runs` | Where reports are written and replayed from |
+| `ARBORIST_DEMO_RUN` | — | A specific report to show on page load |
 
 ## Adding an execution backend
 

@@ -30,9 +30,11 @@ Everything else is pure logic and is tested without either.
                     │  tools/tavily.py    │──────────────────────────► Tavily
                     └─────────────────────┘
 
-   repo.py   — repository IO, patch application, JUnit parsing, diffing
-   models.py — the data that crosses every boundary
-   config.py — one place that reads the environment
+   repo.py    — repository IO, patch application, JUnit parsing, diffing
+   report.py  — a run rendered as the pull request body a human reviews
+   publish.py — branch, commit, push, open — each one opt-in
+   models.py  — the data that crosses every boundary
+   config.py  — one place that reads the environment
 ```
 
 ## Module responsibilities
@@ -46,6 +48,8 @@ Everything else is pure logic and is tested without either.
 | [`sandbox.py`](../arborist/sandbox.py) | The four-operation backend contract and its two implementations | Knowing what a patch or a test is |
 | [`repo.py`](../arborist/repo.py) | Reading a tree, applying edits, parsing JUnit, producing diffs | Any network call |
 | [`search.py`](../arborist/search.py) | Selection, scoring, expansion, pruning, termination, the run report | Talking to a provider directly |
+| [`report.py`](../arborist/report.py) | Turning a finished run into markdown: the fix, the evidence, the rejected alternatives | Touching git or the network |
+| [`publish.py`](../arborist/publish.py) | Git and `gh` plumbing, and the guard rails in front of each outward-facing step | Acting without being asked — every entry point plans first |
 | [`server.py`](../arborist/server.py) | HTTP surface, one thread per run, SSE fan-out with replay | Search logic |
 | [`cli.py`](../arborist/cli.py) | Terminal rendering of the same event stream | Search logic |
 

@@ -387,6 +387,7 @@ class Arborist:
             parent_id=parent.node.id,
             depth=parent.node.depth + 1,
             hypothesis=hypothesis,
+            diagnosis=meta.get("root_cause", ""),
             model_tier="nano",
         )
         started = time.time()

@@ -207,26 +207,41 @@ def parse_json(raw: str) -> dict:
 class ScriptedLLM:
     """Deterministic stand-in used by the test suite.
 
-    Responses are keyed by tier and popped in order; anything unscripted returns
-    an empty object, which the search must survive.
+    Two ways to script it, and the second matters more than it looks:
+
+    ``responses``
+        Queues keyed by tier, popped in order.
+    ``by_prompt``
+        ``{tier: {prompt_substring: response}}``. Checked before the queue. Patch
+        proposals run concurrently, so a purely ordered queue would hand branch A
+        the response meant for branch B; keying on text unique to one branch --
+        its ``Title:`` line -- makes a parallel fan-out reproducible. Scoped by
+        tier because the same words appear in the diagnosis prompt too.
+
+    Anything unscripted returns an empty object, which the search must survive.
     """
 
     responses: dict[str, list[dict]] = field(default_factory=dict)
+    by_prompt: dict[str, dict[str, dict]] = field(default_factory=dict)
     calls: list[tuple[str, str]] = field(default_factory=list)
     usage: dict[str, Usage] = field(default_factory=lambda: {t: Usage() for t in ("nano", "super", "ultra")})
+    lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
-    def _next(self, tier: str) -> dict:
-        queue = self.responses.get(tier) or []
-        self.usage.setdefault(tier, Usage()).add(10, 10)
-        return queue.pop(0) if queue else {}
+    def _respond(self, tier: str, user: str) -> dict:
+        with self.lock:
+            self.calls.append((tier, user[:200]))
+            self.usage.setdefault(tier, Usage()).add(10, 10)
+            for needle, response in (self.by_prompt.get(tier) or {}).items():
+                if needle in user:
+                    return response
+            queue = self.responses.get(tier) or []
+            return queue.pop(0) if queue else {}
 
     def json(self, tier: str, system: str, user: str, schema: dict | None = None, **kw) -> dict:
-        self.calls.append((tier, user[:200]))
-        return self._next(tier)
+        return self._respond(tier, user)
 
     def text(self, tier: str, system: str, user: str, **kw) -> str:
-        self.calls.append((tier, user[:200]))
-        return json.dumps(self._next(tier))
+        return json.dumps(self._respond(tier, user))
 
     @property
     def tokens_used(self) -> int:

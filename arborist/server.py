@@ -21,14 +21,26 @@ from pydantic import BaseModel
 
 from .config import load_settings
 from .llm import NemotronClient
+from .report import load_report
 from .sandbox import build_backend
 from .search import Arborist, RunConfig, write_report
 from .tools.tavily import TavilyClient
 
 UI_DIR = Path(__file__).resolve().parents[1] / "ui"
-RUNS_DIR = Path("runs")
 
 app = FastAPI(title="Arborist", version="0.1.0")
+
+
+def _runs_dir() -> Path:
+    return Path(load_settings().runs_dir)
+
+
+def _saved_reports() -> list[Path]:
+    """Finished run reports on disk, newest first."""
+    directory = _runs_dir()
+    if not directory.is_dir():
+        return []
+    return sorted(directory.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
 
 
 class StartRun(BaseModel):
@@ -101,7 +113,7 @@ def _execute(run: _Run) -> None:
             )
         )
         run.result = result.to_dict()
-        write_report(result, RUNS_DIR)
+        write_report(result, _runs_dir())
     except Exception as exc:  # noqa: BLE001 - reported to the client, never crashes the server
         run.error = f"{type(exc).__name__}: {exc}"
         run.publish({"type": "error", "message": run.error, "at": time.time()})
@@ -126,24 +138,42 @@ def start_run(request: StartRun) -> dict:
 
 @app.get("/api/runs")
 def list_runs() -> dict:
-    return {
-        "runs": [
-            {
-                "run_id": r.id,
-                "repo": r.request.repo_path,
-                "done": r.done.is_set(),
-                "started_at": r.started_at,
-                "solved": (r.result or {}).get("solved"),
-            }
-            for r in sorted(_RUNS.values(), key=lambda r: r.started_at, reverse=True)
-        ]
-    }
+    live = [
+        {
+            "run_id": r.id,
+            "repo": r.request.repo_path,
+            "done": r.done.is_set(),
+            "started_at": r.started_at,
+            "solved": (r.result or {}).get("solved"),
+            "recorded": False,
+        }
+        for r in sorted(_RUNS.values(), key=lambda r: r.started_at, reverse=True)
+    ]
+    seen = {row["run_id"] for row in live}
+    saved = [
+        {
+            "run_id": path.stem,
+            "repo": "",
+            "done": True,
+            "started_at": path.stat().st_mtime,
+            "solved": None,
+            "recorded": True,
+        }
+        for path in _saved_reports()
+        if path.stem not in seen
+    ]
+    return {"runs": live + saved}
 
 
 @app.get("/api/runs/{run_id}")
 def get_run(run_id: str) -> dict:
     run = _RUNS.get(run_id)
     if run is None:
+        # A run from an earlier process is still readable from its report.
+        for path in _saved_reports():
+            if path.stem == run_id:
+                return {"run_id": run_id, "done": True, "error": "",
+                        "result": load_report(path), "events": [], "recorded": True}
         raise HTTPException(status_code=404, detail="unknown run")
     return {
         "run_id": run.id,
@@ -183,6 +213,43 @@ async def stream_events(run_id: str) -> StreamingResponse:
     )
 
 
+@app.get("/api/demo")
+def demo_run() -> dict:
+    """The run to show when the page opens.
+
+    A deployed demo has no credentials and no repository to point at, so an
+    empty tree would teach a visitor nothing. This serves a real, finished
+    search instead -- clearly labelled as recorded, never presented as live.
+    """
+    settings = load_settings()
+    if settings.demo_run:
+        candidates = [Path(settings.demo_run)]
+    else:
+        # Newest-first is the wrong default on its own: the last thing written
+        # is often a one-node experiment. Prefer a run that actually finished
+        # green and has a tree worth looking at.
+        loaded = []
+        for path in _saved_reports():
+            try:
+                loaded.append((path, load_report(path)))
+            except (OSError, ValueError):
+                continue
+        loaded.sort(key=lambda pair: (bool(pair[1].get("solved")), len(pair[1].get("nodes", []))), reverse=True)
+        candidates = [path for path, _ in loaded]
+
+    for path in candidates:
+        try:
+            return {
+                "available": True,
+                "source": path.name,
+                "recorded_at": path.stat().st_mtime,
+                "run": load_report(path),
+            }
+        except (OSError, ValueError):
+            continue
+    return {"available": False, "source": "", "recorded_at": None, "run": None}
+
+
 @app.get("/api/health")
 def health() -> dict:
     settings = load_settings()
@@ -190,8 +257,10 @@ def health() -> dict:
         "ok": True,
         "llm_configured": settings.has_llm,
         "tavily_configured": settings.has_tavily,
+        "can_run": settings.has_llm,
         "backend": settings.backend,
         "models": settings.models,
+        "saved_runs": len(_saved_reports()),
     }
 
 

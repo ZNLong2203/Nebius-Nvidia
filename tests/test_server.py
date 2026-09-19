@@ -20,9 +20,12 @@ PYTEST_CMD = f"{shlex.quote(sys.executable)} -m pytest -q"
 
 
 @pytest.fixture
-def client(monkeypatch):
+def client(monkeypatch, tmp_path):
     monkeypatch.setenv("NEBIUS_API_KEY", "test-key")
     monkeypatch.setenv("ARBORIST_BACKEND", "local")
+    # Keep run reports out of the working tree; a test must not leave artefacts.
+    monkeypatch.setenv("ARBORIST_RUNS_DIR", str(tmp_path / "runs"))
+    monkeypatch.delenv("ARBORIST_DEMO_RUN", raising=False)
     server._RUNS.clear()
     return TestClient(server.app)
 
@@ -112,3 +115,65 @@ def test_events_replay_for_a_late_subscriber(client, monkeypatch):
         assert response.status_code == 200
         body = "".join(chunk for chunk in response.iter_text())
     assert "run_started" in body
+
+
+# --------------------------------------------------------------------------- #
+# replaying finished runs
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def runs_dir(tmp_path, monkeypatch, multi_branch_report):
+    import json
+
+    directory = tmp_path / "runs"
+    directory.mkdir()
+    (directory / f"{multi_branch_report['run_id']}.json").write_text(json.dumps(multi_branch_report))
+    monkeypatch.setenv("ARBORIST_RUNS_DIR", str(directory))
+    return directory
+
+
+def test_demo_serves_the_newest_saved_run(client, runs_dir, multi_branch_report):
+    body = client.get("/api/demo").json()
+    assert body["available"] is True
+    assert body["source"].startswith(multi_branch_report["run_id"])
+    assert body["run"]["solved"] is True
+    assert len(body["run"]["nodes"]) == len(multi_branch_report["nodes"])
+
+
+def test_demo_honours_an_explicit_report(client, runs_dir, monkeypatch, multi_branch_report):
+    target = next(runs_dir.glob("*.json"))
+    monkeypatch.setenv("ARBORIST_DEMO_RUN", str(target))
+    assert client.get("/api/demo").json()["source"] == target.name
+
+
+def test_demo_is_empty_when_nothing_has_been_recorded(client, tmp_path, monkeypatch):
+    monkeypatch.setenv("ARBORIST_RUNS_DIR", str(tmp_path / "nothing-here"))
+    body = client.get("/api/demo").json()
+    assert body == {"available": False, "source": "", "recorded_at": None, "run": None}
+
+
+def test_demo_skips_a_corrupt_report(client, runs_dir):
+    (runs_dir / "broken.json").write_text("{not json")
+    body = client.get("/api/demo").json()
+    assert body["available"] is True, "one bad file must not take the demo down"
+
+
+def test_a_run_from_a_previous_process_is_still_readable(client, runs_dir, multi_branch_report):
+    payload = client.get(f"/api/runs/{multi_branch_report['run_id']}").json()
+    assert payload["recorded"] is True
+    assert payload["done"] is True
+    assert payload["result"]["solved"] is True
+
+
+def test_listing_includes_saved_runs(client, runs_dir, multi_branch_report):
+    rows = client.get("/api/runs").json()["runs"]
+    assert any(r["run_id"] == multi_branch_report["run_id"] and r["recorded"] for r in rows)
+
+
+def test_health_reports_whether_a_live_run_is_possible(client, runs_dir, monkeypatch):
+    assert client.get("/api/health").json()["can_run"] is True
+    monkeypatch.delenv("NEBIUS_API_KEY")
+    body = client.get("/api/health").json()
+    assert body["can_run"] is False
+    assert body["saved_runs"] == 1

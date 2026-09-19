@@ -14,6 +14,8 @@ from rich.tree import Tree as RichTree
 from .config import load_settings
 from .llm import NemotronClient
 from .models import Node
+from .publish import GitError, build_plan, publish
+from .report import load_report, render_markdown_summary, render_pr_body
 from .sandbox import build_backend
 from .search import Arborist, RunConfig, RunResult, write_report
 from .tools.tavily import TavilyClient
@@ -196,6 +198,90 @@ def _render_tree(nodes: list[Node]) -> RichTree:
     if root_nodes:
         attach(root_nodes[0], tree)
     return tree
+
+
+@app.command()
+def report(
+    run_report: Path = typer.Argument(..., help="A run report JSON written by `arborist fix`."),
+    out: Path = typer.Option(None, "--out", "-o", help="Write the markdown here instead of stdout."),
+    summary: bool = typer.Option(False, "--summary", help="One line instead of the full body."),
+) -> None:
+    """Render a run as the pull request body a reviewer would read."""
+    try:
+        data = load_report(run_report)
+    except (OSError, ValueError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(code=2) from exc
+
+    text = render_markdown_summary(data) if summary else render_pr_body(data)
+    if out:
+        out.write_text(text, encoding="utf-8")
+        console.print(f"written: [bold]{out}[/]")
+    else:
+        print(text)
+
+
+@app.command()
+def pr(
+    run_report: Path = typer.Argument(..., help="A run report JSON written by `arborist fix`."),
+    repo: Path = typer.Option(Path("."), "--repo", "-r", help="The git repository to branch from."),
+    branch: str = typer.Option(None, "--branch", "-b", help="Branch name (default: derived from the fix)."),
+    base: str = typer.Option(None, "--base", help="Base branch (default: the current one)."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Actually create the branch and commit."),
+    push: bool = typer.Option(False, "--push", help="Also push the branch to origin. Implies --yes."),
+    open_pr: bool = typer.Option(False, "--open", help="Also open the pull request with gh. Implies --push."),
+) -> None:
+    """Open a pull request from a run, alternatives and all.
+
+    Dry run by default: it prints the branch, the commands and the body, and
+    changes nothing. Creating a branch needs --yes; pushing and opening the pull
+    request are separate opt-ins on top of that.
+    """
+    try:
+        data = load_report(run_report)
+        plan = build_plan(data, repo, branch=branch, base=base)
+    except (OSError, ValueError, GitError) as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(code=2) from exc
+
+    if open_pr:
+        push = True
+    if push:
+        yes = True
+
+    console.print(
+        Panel(
+            f"[bold]{plan.title}[/]\n\n"
+            f"repo    {plan.repo_path}\n"
+            f"base    {plan.base}\n"
+            f"branch  {plan.branch}\n"
+            f"files   {', '.join(plan.files) or '(none)'}",
+            title="pull request",
+        )
+    )
+
+    if not yes:
+        console.print("\n[dim]dry run — nothing has changed. Pass --yes to create the branch.[/]\n")
+        console.print(plan.describe())
+        console.rule("body")
+        print(plan.body)
+        return
+
+    try:
+        result = publish(plan, push=push, open_pr=open_pr)
+    except GitError as exc:
+        console.print(f"[red]{exc}[/]")
+        raise typer.Exit(code=1) from exc
+
+    for step in result.steps:
+        console.print(f"[green]✓[/] {step}")
+    if result.pr_url:
+        console.print(f"\n[bold]{result.pr_url}[/]")
+    elif result.committed and not result.pushed:
+        console.print(
+            f"\n[dim]branch {plan.branch} is committed locally. "
+            f"Push it with:[/] git push -u origin {plan.branch}"
+        )
 
 
 @app.command()

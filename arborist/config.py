@@ -59,6 +59,16 @@ class Settings:
     default_image: str = "python:3.12-slim"
     exec_timeout: float = 900.0
 
+    # --- serving -------------------------------------------------------------
+    runs_dir: str = "runs"
+    demo_run: str = ""
+    """A saved run report to show when the page opens.
+
+    A deployed demo should display a real, finished search to someone who has
+    not configured anything -- empty state teaches nobody. Defaults to the most
+    recent report in ``runs_dir``.
+    """
+
     models: dict[str, str] = field(default_factory=lambda: dict(TIERS))
 
     @property
@@ -84,6 +94,8 @@ def load_settings(**overrides) -> Settings:
         max_nodes=_int("ARBORIST_MAX_NODES", Settings.max_nodes),
         max_depth=_int("ARBORIST_MAX_DEPTH", Settings.max_depth),
         token_budget=_int("ARBORIST_TOKEN_BUDGET", Settings.token_budget),
+        runs_dir=os.environ.get("ARBORIST_RUNS_DIR") or Settings.runs_dir,
+        demo_run=os.environ.get("ARBORIST_DEMO_RUN", ""),
     )
     if overrides:
         clean = {k: v for k, v in overrides.items() if v is not None}

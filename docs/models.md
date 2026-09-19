@@ -152,17 +152,31 @@ ultra   nvidia/nemotron-3-ultra-550b-a55b      0        0
 Implemented in [`arborist/tools/tavily.py`](../arborist/tools/tavily.py). It is
 the **only** part of the search that touches the network beyond Nebius.
 
-Diagnosis decides for itself when to use it, by setting `needs_external_docs` and
-emitting a `search_query`. The instruction is narrow:
+A lookup fires on any of three signals from the diagnosis:
 
-> Set `needs_external_docs` only when the failure originates inside a third-party
-> package and the repository cannot tell you why.
+| Signal | Why it is enough on its own |
+|---|---|
+| `needs_external_docs` | The model says the repository cannot tell it why. |
+| `external_package` is named | The failure originates inside a dependency. |
+| `confidence` below 0.6 | The model is unsure, whatever it attributed the fault to. |
 
-That is the class of bug a repo-local agent cannot reason its way out of — a
-changed API, a deprecation, behaviour inside a dependency — because the answer was
-never in the context window. When it fires, diagnosis runs **once more** with the
-retrieved evidence appended, and the evidence is carried into the patch prompts
-for that expansion.
+The middle one is the one that earns its keep, and it was added after a
+measurement. Asking only when the model volunteers "I don't know" turned out to
+be too narrow: on the `outside-knowledge` case — a Pydantic 1.x model in a
+project pinned to 2.x — Nemotron was confident, never asked, and never searched.
+
+**A model is confidently wrong about a library exactly when its training
+snapshot predates the version in the repository**, and that is the case worth
+catching. It cannot know it is in that case, so its own confidence is not a
+usable filter. One Tavily call costs less than one wrong patch and the sandbox
+execution behind it, so the lookup happens whenever a dependency is implicated
+at all.
+
+A confident, repo-local diagnosis still never touches the network.
+
+When it fires, diagnosis runs **once more** with the retrieved evidence
+appended, and the evidence is carried into the patch prompts for that expansion.
+The run report records the query and which of the three signals triggered it.
 
 Results are cached per query within a run, and any failure degrades to "no
 evidence" rather than raising: search is an optimisation, never a dependency.

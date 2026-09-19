@@ -15,8 +15,15 @@ DIAGNOSE_SCHEMA = {
     "type": "object",
     "properties": {
         "root_cause": {"type": "string"},
-        "confidence": {"type": "number"},
+        "confidence": {
+            "type": "number",
+            "description": "0-1, or 0-100; how sure you are of the root cause",
+        },
         "needs_external_docs": {"type": "boolean"},
+        "external_package": {
+            "type": "string",
+            "description": "the third-party package the failure originates in, or empty",
+        },
         "search_query": {"type": "string"},
         "request_files": {"type": "array", "items": {"type": "string"}},
         "hypotheses": {
@@ -33,7 +40,11 @@ DIAGNOSE_SCHEMA = {
             },
         },
     },
-    "required": ["root_cause", "hypotheses"],
+    # These three drive the lookup policy, and a field that is merely optional
+    # is a field the model omits: asked with only root_cause and hypotheses
+    # required, Nemotron returned exactly those two and nothing else, so the
+    # policy could never fire.
+    "required": ["root_cause", "confidence", "needs_external_docs", "external_package", "hypotheses"],
 }
 
 PATCH_SCHEMA = {
@@ -73,9 +84,13 @@ Rules:
   invent a file, symbol or line you have not seen.
 - Prefer fixing the source under test, not the test, unless the failure output
   proves the test encodes a wrong expectation.
-- Set needs_external_docs only when the failure originates inside a third-party
-  package and the repository cannot tell you why. Then give a precise
-  search_query naming the library, the version and the symbol.
+- Name the third-party package in external_package whenever the failure
+  originates inside one, even if you believe you already know the fix. Your
+  knowledge of a library is a snapshot of when you were trained; the pin in this
+  repository may be newer.
+- Set needs_external_docs when the repository genuinely cannot tell you why.
+- Whenever either applies, give a precise search_query naming the library, the
+  version and the symbol.
 - If you need to see a file you were not given, list it in request_files.
 
 Reply with JSON only."""
@@ -169,9 +184,36 @@ Each one must address a failure that is STILL failing in the output above."""
         "super" if tier == "super" else tier, DIAGNOSE_SYSTEM, user, DIAGNOSE_SCHEMA, max_tokens=6000
     )
 
+    # When to look something up.
+    #
+    # Asking only when the model volunteers "I don't know" is too narrow: a model
+    # is confidently wrong about a library exactly when its training snapshot
+    # predates the version in the repository, and that is the case worth
+    # catching. So the lookup also fires when the failure is attributed to a
+    # third-party package at all, or when the model's own stated confidence in
+    # its diagnosis is low. One cheap search is worth less than one wrong patch
+    # and the sandbox execution behind it.
     evidence = ""
-    if tavily and tavily.enabled and data.get("needs_external_docs"):
+    # Nemotron answers this on a 0-100 scale despite the field being described as
+    # a probability, so accept either and normalise.
+    raw_confidence = data.get("confidence")
+    confidence = None
+    if isinstance(raw_confidence, (int, float)) and not isinstance(raw_confidence, bool):
+        confidence = raw_confidence / 100 if raw_confidence > 1 else float(raw_confidence)
+    low_confidence = confidence is not None and confidence < 0.6
+    reason = (
+        "model asked"
+        if data.get("needs_external_docs")
+        else "third-party package implicated"
+        if (data.get("external_package") or "").strip()
+        else "low confidence in the diagnosis"
+        if low_confidence
+        else ""
+    )
+    if tavily and tavily.enabled and reason:
         query = (data.get("search_query") or "").strip()
+        if not query and (data.get("external_package") or "").strip():
+            query = f"{data['external_package']} {data.get('root_cause', '')}".strip()[:200]
         if query:
             answer, hits = tavily.search(query)
             evidence = tavily.render(answer, hits)
@@ -208,9 +250,11 @@ Each one must address a failure that is STILL failing in the output above."""
 
     meta = {
         "root_cause": (data.get("root_cause") or "").strip(),
-        "confidence": data.get("confidence"),
+        "confidence": confidence,
         "request_files": [str(p) for p in (data.get("request_files") or []) if p],
         "searched": bool(evidence),
+        "search_reason": reason if evidence else "",
+        "external_package": (data.get("external_package") or "").strip(),
         "search_query": (data.get("search_query") or "").strip(),
         "evidence": evidence[:4000],
         "attempts": attempts,

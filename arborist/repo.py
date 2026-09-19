@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import difflib
 import fnmatch
 import re
@@ -157,7 +158,38 @@ def apply_edits(files: dict[str, str], edits: list[Edit]) -> dict[str, str]:
 
     if updated == files:
         raise PatchError("patch is a no-op")
+
+    _reject_broken_syntax(files, updated)
     return updated
+
+
+def _reject_broken_syntax(before: dict[str, str], after: dict[str, str]) -> None:
+    """Refuse a patch that leaves a Python file unparseable.
+
+    A model asked to restate a whole file sometimes mangles the escaping or
+    truncates it. Without this check the agent then spends its remaining budget
+    repairing damage it caused itself -- one observed run burned six patches on
+    exactly that, having started from a file that merely needed a decorator
+    changed. Catching it here costs tokens; catching it after execution costs a
+    sandbox run and a poisoned branch.
+    """
+    for path, body in after.items():
+        if not path.endswith(".py") or before.get(path) == body:
+            continue
+        try:
+            ast.parse(body)
+        except SyntaxError as exc:
+            was_valid = True
+            if path in before:
+                try:
+                    ast.parse(before[path])
+                except SyntaxError:
+                    was_valid = False
+            if was_valid:
+                raise PatchError(
+                    f"{path}: the patched file is not valid Python "
+                    f"(line {exc.lineno}: {exc.msg}). Send the file again, complete and unescaped."
+                ) from exc
 
 
 def _resolve_path(path: str, files: dict[str, str]) -> str | None:

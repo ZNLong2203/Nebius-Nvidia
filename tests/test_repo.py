@@ -186,3 +186,30 @@ def test_text_files_skips_binaries():
 def test_test_report_green_requires_tests():
     assert not TestReport(total=0).green
     assert TestReport(total=2, passed=2).green
+
+
+def test_apply_edits_rejects_a_rewrite_that_breaks_the_file():
+    """A mangled whole-file rewrite otherwise costs a sandbox run and poisons the branch."""
+    with pytest.raises(PatchError, match="not valid Python"):
+        apply_edits({"m.py": SAMPLE}, [Edit(path="m.py", new_content="def add(a, b:\n    return")])
+
+
+def test_the_rejection_tells_the_model_what_to_do():
+    try:
+        apply_edits({"m.py": SAMPLE}, [Edit(path="m.py", new_content="x = (1\n")])
+    except PatchError as exc:
+        assert "complete and unescaped" in str(exc)
+    else:
+        raise AssertionError("expected a PatchError")
+
+
+def test_a_file_that_was_already_broken_is_not_blamed_on_the_patch():
+    """Repairing a file that does not parse is a legitimate thing to be doing."""
+    broken = "def f(:\n    pass\n"
+    out = apply_edits({"m.py": broken}, [Edit(path="m.py", new_content="def f():\n    pass\n")])
+    assert out["m.py"] == "def f():\n    pass\n"
+
+
+def test_non_python_files_are_not_syntax_checked():
+    out = apply_edits({"a.py": SAMPLE, "r.txt": "x"}, [Edit(path="r.txt", new_content="{{ not python")])
+    assert out["r.txt"] == "{{ not python"

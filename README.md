@@ -84,7 +84,7 @@ All three are served through **Nebius Token Factory**'s OpenAI-compatible endpoi
 | **Token Factory — inference** | Every Nemotron call, via `https://api.tokenfactory.nebius.com/v1/`. One base URL, three models, no per-model plumbing — swapping a tier is a one-line change in [`arborist/config.py`](arborist/config.py). |
 | **Token Factory — structured output** | `json_schema` response format on diagnosis, patch generation and adjudication, with a lenient recovery parser behind it ([`arborist/llm.py`](arborist/llm.py)). |
 | **Token Factory — Sandboxes (ConTree)** | Every command execution. The Git-like branching *is* the product: `base()` builds the prefix, `run()` forks from any checkpoint, `read()` pulls the JUnit report back out of a specific state. See [`arborist/sandbox.py`](arborist/sandbox.py). |
-| **Tavily** | Diagnosis decides for itself when the failure originates *outside* the repository — inside a third-party package, a changed API, a deprecation — and only then emits a query. Those are precisely the bugs a repo-local agent cannot reason its way out of, because the answer was never in the context window. Nothing else in the search touches the network. See [`arborist/tools/tavily.py`](arborist/tools/tavily.py). |
+| **Tavily** | Consulted when the diagnosis implicates a third-party package, asks for documentation, or reports low confidence in itself. The middle trigger was added after a measurement: on the `outside-knowledge` case Nemotron was confident, never asked, and never searched — because **a model is confidently wrong about a library exactly when its training snapshot predates the version in the repository**, and it cannot know it is in that case. One lookup costs less than one wrong patch and the sandbox execution behind it. A confident, repo-local diagnosis still never touches the network. See [`arborist/tools/tavily.py`](arborist/tools/tavily.py). |
 
 ### Where Token Factory accelerated the build
 
@@ -163,20 +163,48 @@ python evals/run_eval.py --cases all
 
 Runs every case twice under an identical budget, branching on and off, and writes `evals/results.md` with: solved yes/no, tests passing before and after, patches evaluated, sandbox executions, **how many times setup had to run**, invalid patches, wall time, and tokens per tier.
 
-Three cases ship, each testing a different property. The answer keys live in
-[`evals/README.md`](evals/README.md), never inside a case — anything inside is
-loaded into the agent's context, and a demo that reads its own answer key proves
-nothing:
+Three cases ship. The answer keys live in [`evals/README.md`](evals/README.md),
+never inside a case — anything inside is loaded into the agent's context, and a
+demo that reads its own answer key proves nothing.
 
-| Case | The situation | What it measures |
-|---|---|---|
-| **`broken-invoice`** | Three independent bugs in three files | **Depth** — can it keep a partial repair and build the next fix on top of it? |
-| **`regression-trap`** | A TTL cache where the obvious fix for test A silently breaks test B | **Backtracking** — does it notice a *trade* and refuse to follow it? |
-| **`outside-knowledge`** | A Pydantic 1.x model in a project pinned to 2.x | **Looking things up** — the answer is in no file here, and the lazy fix that silences the error still fails |
+`--model-set matched-baseline` reruns the same cases on size-matched non-NVIDIA
+models from the same Token Factory account (Qwen3 30B A3B against Nemotron 3
+Nano 30B A3B, gpt-oss 120B against Super), so a model comparison changes the
+model and nothing else.
 
-`regression-trap` is the one that matters most. Scoring on pass-rate alone calls "fixed two, broke one" progress. Arborist scores against the parent's **test identities**, so a trade shows up as a regression, the branch is marked and abandoned, and the search returns to the sibling. See `Arborist.score` in [`arborist/search.py`](arborist/search.py).
+### What the numbers actually show
 
-> Results in `evals/results.md` are whatever your own run produces. Numbers are not checked in, because a benchmark table you cannot reproduce is worth nothing.
+Two findings, and only one of them is the one this project set out to make.
+
+**Patch application mattered more than the search.** Saving every run's tree
+made the real bottleneck visible: three of five patches never reached the
+sandbox because the model quoted a fragment of a docstring-bearing file slightly
+wrong, and the next expansion repeated the same mistake because a failed patch
+taught the search nothing. Naming short files as whole-file rewrites and giving
+a failed patch one repair attempt with the reason fed back took the invalid rate
+from 3-of-5 to 0-of-8, and turned two unsolved runs into solved ones.
+
+**Branching is not yet shown to beat a linear baseline.** On `broken-invoice`
+after that fix, the linear baseline reached 9/9 with a single patch in 157s and
+27.6k tokens; the branching search reached 9/9 at depth 3 in 333s and 86.8k
+tokens. Same answer, a third of the cost, no branching.
+
+The reason is a flaw in the cases, not a verdict on the method: **all three are
+solvable by one patch**, and a case one patch solves cannot measure a search at
+all. Building a case that genuinely requires search — where the second fault is
+invisible until the first is repaired — is the open work, and until it exists
+this repository does not claim branching wins.
+
+What the design does buy, and what the eval does show, is narrower and still
+worth having: forking a warm checkpoint makes evaluating several rival patches
+from an identical state cheap enough to be ordinary, and scoring against the
+parent's *test identities* makes a trade — fixed two, broke one — visible as the
+regression it is rather than as progress. See `Arborist.score` in
+[`arborist/search.py`](arborist/search.py).
+
+> Results in `evals/results.md` are whatever your own run produces. Numbers are
+> not checked in, because a benchmark table you cannot reproduce is worth
+> nothing.
 
 ---
 

@@ -89,8 +89,10 @@ Output format, strictly:
   including indentation, and must appear EXACTLY ONCE in that file. Include
   enough surrounding lines to make it unique.
 - `replace` is what those lines become.
-- For a file short enough to restate in full, you may instead send
-  {"path": "...", "new_content": "<entire file>"}.
+- When a file is SHORT (you will be told which ones), do not quote a snippet at
+  all -- send {"path": "...", "new_content": "<the entire file>"} instead.
+  Reproducing a whole short file is more reliable than reproducing an exact
+  fragment of it, and a fragment that does not match costs the branch.
 - Change as little as possible. Do not reformat, do not rename, do not add
   comments explaining the fix, do not touch unrelated code.
 - Implement only the hypothesis you were given. Another branch is handling the
@@ -240,6 +242,9 @@ def _read_hypotheses(data: dict, fanout: int) -> list[Hypothesis]:
     return hypotheses
 
 
+REWRITE_LINE_LIMIT = 80
+
+
 def propose_patch(
     llm: LLM,
     *,
@@ -252,9 +257,25 @@ def propose_patch(
     stderr: str,
     sources: dict[str, str],
     evidence: str = "",
+    retry_note: str = "",
 ) -> tuple[list[Edit], str]:
-    """Turn one hypothesis into one concrete patch."""
+    """Turn one hypothesis into one concrete patch.
+
+    ``retry_note`` carries back the reason a previous attempt could not be
+    applied. A patch that does not apply teaches the search nothing and the next
+    expansion cheerfully repeats it, so the reason has to come back to the
+    model rather than only into the report.
+    """
     extra = f"\n\nEXTERNAL DOCUMENTATION\n{evidence[:4000]}" if evidence else ""
+
+    short = [p for p, body in sources.items() if len(body.splitlines()) <= REWRITE_LINE_LIMIT]
+    rewrite_hint = (
+        "\n\nSHORT FILES -- for these, send `new_content` with the whole file rather "
+        "than a search/replace pair:\n" + "\n".join(f"- {p}" for p in short)
+        if short
+        else ""
+    )
+    repair = f"\n\nA PREVIOUS ATTEMPT FAILED TO APPLY: {retry_note}\nDo not repeat it." if retry_note else ""
     user = f"""Test command: `{test_command}`
 
 DIAGNOSIS
@@ -270,7 +291,7 @@ FAILURE OUTPUT
 {_failure_digest(report, stdout, stderr, limit=3500)}
 
 SOURCE
-{render_context(sources)}{extra}
+{render_context(sources)}{extra}{rewrite_hint}{repair}
 
 Write the minimal patch that implements this hypothesis."""
 

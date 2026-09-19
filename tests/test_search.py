@@ -236,6 +236,86 @@ def test_an_unapplicable_patch_costs_tokens_but_no_sandbox_run(backend):
     assert not result.solved
 
 
+def test_a_patch_that_does_not_apply_gets_one_repaired_attempt(backend):
+    """A failed patch taught the search nothing: the next expansion read the same
+    source, formed the same theory and quoted the same snippet that did not match."""
+    llm = ScriptedLLM(
+        responses={
+            "super": [_diagnosis("banker's rounding in round_money", "src/billing/money.py")],
+            "nano": [
+                {
+                    "explanation": "quoting a snippet that is not there",
+                    "edits": [
+                        {
+                            "path": "src/billing/money.py",
+                            "search": "def round_money(value: float) -> Decimal:",
+                            "replace": "def round_money(value: float) -> float:",
+                        }
+                    ],
+                },
+                {
+                    "explanation": "second attempt, whole file",
+                    "edits": [{"path": "src/billing/money.py", "new_content": MONEY_FIXED}],
+                },
+            ],
+        }
+    )
+    settings = load_settings(backend="local", fanout=1, max_nodes=2, max_depth=2)
+    agent = Arborist(settings, backend, llm)
+    result = agent.run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
+
+    child = next(n for n in result.nodes if n.depth == 1)
+    assert child.status == "improved", "the retry rescued the branch"
+    assert "applied on retry after" in child.note
+    assert result.stats["invalid_patches"] == 0
+
+    retry_prompt = next(
+        user for _tier, user in llm.calls if "A PREVIOUS ATTEMPT FAILED TO APPLY" in user
+    )
+    assert "search block not found" in retry_prompt, "the reason comes back to the model"
+
+
+def test_a_patch_that_fails_twice_is_given_up_on(backend):
+    bad = {
+        "explanation": "still wrong",
+        "edits": [{"path": "src/billing/money.py", "search": "def nope():", "replace": "pass"}],
+    }
+    llm = ScriptedLLM(
+        responses={
+            "super": [_diagnosis("wrong guess", "src/billing/money.py")],
+            "nano": [bad, bad],
+        }
+    )
+    settings = load_settings(backend="local", fanout=1, max_nodes=2, max_depth=2)
+    result = Arborist(settings, backend, llm).run(
+        RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD)
+    )
+
+    child = next(n for n in result.nodes if n.depth == 1)
+    assert child.status == "invalid"
+    assert "retry:" in child.note
+    assert result.stats["invalid_patches"] == 1
+    assert result.stats["sandbox_executions"] == 1, "neither attempt reached the sandbox"
+
+
+def test_short_files_are_offered_for_whole_file_rewrite(backend):
+    """Reproducing a whole short file is more reliable than an exact fragment of it."""
+    llm = ScriptedLLM(
+        responses={
+            "super": [_diagnosis("anything", "src/billing/money.py")],
+            "nano": [{"edits": [{"path": "src/billing/money.py", "new_content": MONEY_FIXED}]}],
+        }
+    )
+    settings = load_settings(backend="local", fanout=1, max_nodes=1, max_depth=1)
+    Arborist(settings, backend, llm).run(
+        RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD)
+    )
+
+    patch_prompt = next(user for tier, user in llm.calls if "YOUR ASSIGNED HYPOTHESIS" in user)
+    assert "SHORT FILES" in patch_prompt
+    assert "src/billing/money.py" in patch_prompt.split("SHORT FILES")[1]
+
+
 def test_a_regressing_branch_is_recorded_and_not_followed(backend):
     """A patch that breaks a passing test must not become the next fork point."""
     llm = ScriptedLLM(

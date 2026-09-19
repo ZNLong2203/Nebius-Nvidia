@@ -1,0 +1,34 @@
+[
+  {
+    "case": "broken-invoice",
+    "branching": true,
+    "solved": false,
+    "baseline_passing": "5/9",
+    "final_passing": "7/9",
+    "patches": 5,
+    "sandbox_runs": 4,
+    "setup_runs": 1,
+    "invalid_patches": 3,
+    "wall_seconds": 133.6,
+    "tokens_nano": 31629,
+    "tokens_super": 10381,
+    "tokens_ultra": 0,
+    "error": ""
+  },
+  {
+    "case": "broken-invoice",
+    "branching": false,
+    "solved": false,
+    "baseline_passing": "5/9",
+    "final_passing": "-",
+    "patches": 1,
+    "sandbox_runs": 2,
+    "setup_runs": 1,
+    "invalid_patches": 1,
+    "wall_seconds": 55.6,
+    "tokens_nano": 5604,
+    "tokens_super": 8286,
+    "tokens_ultra": 0,
+    "error": ""
+  }
+]

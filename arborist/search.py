@@ -384,10 +384,14 @@ class Arborist:
             hypotheses=[h.to_dict() for h in hypotheses],
         )
         if not hypotheses:
-            node.note = (
+            # Append: the note already records how this node's own patch was
+            # applied, and that is not superseded by what happened when we
+            # later tried to expand it.
+            stalled = (
                 f"diagnosis produced no hypotheses after {meta.get('attempts', 1)} attempt(s); "
                 f"model replied with keys {meta.get('reply_keys') or '[]'}"
             )
+            node.note = f"{node.note} | {stalled}" if node.note else stalled
             self._update(node)
             return []
 
@@ -462,16 +466,43 @@ class Arborist:
 
         # Validate before spending a sandbox execution: a patch that cannot be
         # applied costs tokens, never wall-clock.
+        #
+        # One repair attempt, with the reason fed back. Without it a failed
+        # patch teaches the search nothing: the next expansion reads the same
+        # source, forms the same theory, and quotes the same snippet that did
+        # not match. Three of five patches were lost that way before this.
         try:
             patched = apply_edits(parent.files, edits)
-        except PatchError as exc:
-            self._invalid_patches += 1
-            node.status = "invalid"
-            node.note = str(exc)
-            node.wall_seconds = time.time() - started
-            parent.tried.append(f"{hypothesis.title} (patch did not apply: {exc})")
-            self._register(node, _NodeState(node, None, parent.files, None))
-            return None
+        except PatchError as first_error:
+            try:
+                self._check_cancelled()
+                edits, explanation = propose_patch(
+                    self.llm,
+                    tier="nano",
+                    hypothesis=hypothesis,
+                    root_cause=meta.get("root_cause", ""),
+                    test_command=cfg.test_command,
+                    report=parent.report,
+                    stdout=parent.stdout,
+                    stderr=parent.stderr,
+                    sources=context,
+                    evidence=meta.get("evidence", ""),
+                    retry_note=str(first_error),
+                )
+                node.edits = edits
+                node.explanation = explanation
+                patched = apply_edits(parent.files, edits)
+                node.note = f"applied on retry after: {first_error}"
+            except (BudgetExceeded, Cancelled):
+                raise
+            except Exception as second_error:  # noqa: BLE001
+                self._invalid_patches += 1
+                node.status = "invalid"
+                node.note = f"{first_error} (retry: {second_error})"
+                node.wall_seconds = time.time() - started
+                parent.tried.append(f"{hypothesis.title} (patch did not apply: {first_error})")
+                self._register(node, _NodeState(node, None, parent.files, None))
+                return None
 
         payload = {p: body.encode("utf-8") for p, body in changed_files(parent.files, patched).items()}
 

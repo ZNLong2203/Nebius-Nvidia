@@ -102,6 +102,7 @@ each alternative did to your test suite."
 | `progress` | after an expansion | `best_score`, `stalls` |
 | `adjudicated` | Ultra broke a tie | `verdict` |
 | `budget_exceeded` | token budget hit | `message` |
+| `cancelled` | a caller asked the run to stop | `message` |
 | `error` | anything unexpected | `message` |
 | `run_finished` | last thing | `result` (the whole report) |
 

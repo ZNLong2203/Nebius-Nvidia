@@ -40,7 +40,9 @@ export default function Page() {
     [shownNodes, selectedId],
   );
 
-  const hasTree = shownNodes.length > 0;
+  // While scrubbing, an empty canvas is a position in the replay, not an
+  // absent run — showing "Nothing searched yet" there is a lie.
+  const hasTree = shownNodes.length > 0 || (replayable && replay.cursor === 0);
   const showActivity = state.activity.length > 0 || state.running;
 
   return (

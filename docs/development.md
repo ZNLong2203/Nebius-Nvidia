@@ -111,7 +111,7 @@ branch exists leaves the commit in place rather than unwinding it silently.
 | `ARBORIST_BACKEND` | `contree` | `contree` \| `local` |
 | `ARBORIST_BRANCHING` | `1` | `0` for the linear baseline |
 | `ARBORIST_FANOUT` | `4` | Candidates per expansion |
-| `ARBORIST_MAX_NODES` | `24` | Sandbox evaluation cap |
+| `ARBORIST_MAX_NODES` | `24` | Cap on candidate patches. Counts every node created, including patches rejected before execution |
 | `ARBORIST_MAX_DEPTH` | `4` | Tree depth cap |
 | `ARBORIST_TOKEN_BUDGET` | `1500000` | Total tokens across all tiers |
 | `ARBORIST_RUNS_DIR` | `runs` | Where reports are written and replayed from |

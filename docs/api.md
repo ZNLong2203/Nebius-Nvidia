@@ -144,7 +144,10 @@ without a key is still fully explorable instead of merely broken.
 
 ## `GET /`
 
-Serves [`ui/index.html`](../ui/index.html) — one file, no build step, no CDN.
+Serves the built Next.js interface from `web/out/` when it exists, and
+[`ui/index.html`](../ui/index.html) — one file, no build step, no CDN — when it
+does not, so an unbuilt checkout still starts. `/_next/*` is mounted only when
+the export is present.
 
 ---
 

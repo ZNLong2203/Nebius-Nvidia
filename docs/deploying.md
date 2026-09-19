@@ -1,8 +1,14 @@
 # Deploying the demo
 
-The agent executes nothing locally — every command it runs happens inside Nebius
-Sandboxes. The deployed service therefore only serves HTTP and calls Token
-Factory, which makes it small and stateless apart from one volume of recorded
+On the `contree` backend the agent executes nothing locally: every command it
+runs happens inside Nebius Sandboxes, and the deployed service only serves HTTP
+and calls Token Factory. On the `local` backend — which is what a deployment
+without Sandboxes access falls back to, and what `compose.yaml` sets — commands
+run **inside the container itself**. That is a reasonable place for them, since
+the image is `python:3.12-slim` and each run installs what the target repository
+needs, but it is worth knowing before exposing the service publicly.
+
+Either way the service is small and stateless apart from one volume of recorded
 runs.
 
 ## What a visitor should see

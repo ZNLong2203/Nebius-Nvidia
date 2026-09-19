@@ -127,7 +127,19 @@ export function useRun() {
     runIdRef.current = runId;
     stopRef.current?.();
     stopRef.current = streamRun(runId, applyRef.current, () =>
-      setState((prev) => ({ ...prev, running: false, stopping: false })),
+      // A dropped connection is not a finished run: the server keeps the whole
+      // event history and will replay it, so say so rather than showing the
+      // partial tree as the result.
+      setState((prev) =>
+        prev.result
+          ? { ...prev, running: false, stopping: false }
+          : {
+              ...prev,
+              running: false,
+              stopping: false,
+              error: "Lost the connection to the run. Reload to replay it from the server.",
+            },
+      ),
     );
   }, []);
 

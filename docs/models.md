@@ -114,7 +114,9 @@ whole search after the call has already been paid for.
 
 ## Structured output
 
-Every call uses Token Factory's structured output:
+Diagnosis and patch generation use Token Factory's structured output. Tie
+adjudication asks for JSON without a schema, because its reply is read by a
+human as much as by the code:
 
 ```python
 response_format = {"type": "json_schema",

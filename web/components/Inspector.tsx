@@ -63,7 +63,10 @@ export function Inspector({
         </div>
       </header>
 
-      <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      {/* Keyed on the node: selecting a different branch resets the scroll
+          position and every collapsed section, rather than showing the new
+          node through the previous one's reading position. */}
+      <div key={node.id} className="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {/* At a glance: the three things worth knowing before any prose. */}
         {report && (
           <div className="mb-5 rounded-xl border border-edge bg-surface-2 px-4 py-3">

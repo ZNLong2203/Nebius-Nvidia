@@ -131,11 +131,14 @@ export function SearchTree({
                     : node.hypothesis?.title || node.explanation || node.note || "patch";
 
                 return (
+                  // Two groups on purpose: the outer one carries the layout
+                  // position as an SVG attribute, the inner one is animated by
+                  // CSS. A CSS `transform` overrides the presentation
+                  // attribute, so animating the positioned group made every
+                  // node enter at the canvas origin and snap into place.
                   <g
                     key={node.id}
                     transform={`translate(${x},${y})`}
-                    className={fresh ? "node-enter" : undefined}
-                    style={{ opacity: dimmed, transition: "opacity 180ms ease" }}
                     role="treeitem"
                     aria-selected={selected}
                     aria-label={`${meta.label}: ${title}, ${passing} tests passing`}
@@ -156,6 +159,10 @@ export function SearchTree({
                       }
                     }}
                   >
+                    <g
+                      className={fresh ? "node-enter" : undefined}
+                      style={{ opacity: dimmed, transition: "opacity 180ms ease" }}
+                    >
                     {node.status === "green" && (
                       <rect
                         className="pulse"
@@ -248,6 +255,7 @@ export function SearchTree({
                       </div>
                     </foreignObject>
                     )}
+                    </g>
                   </g>
                 );
               })}

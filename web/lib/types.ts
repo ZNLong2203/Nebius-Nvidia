@@ -137,6 +137,7 @@ export type RunEvent =
   | { type: "progress"; at: number; best_score: number; stalls: number }
   | { type: "adjudicated"; at: number; verdict: Record<string, unknown> }
   | { type: "budget_exceeded"; at: number; message: string }
+  | { type: "cancelled"; at: number; message: string }
   | { type: "error"; at: number; message: string }
   | { type: "run_finished"; at: number; result: RunResult }
   | { type: "done"; at: number };

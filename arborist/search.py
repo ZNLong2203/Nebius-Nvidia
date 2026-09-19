@@ -24,6 +24,7 @@ That turns two things a linear agent cannot do into ordinary operations:
 from __future__ import annotations
 
 import json
+import threading
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -116,6 +117,10 @@ class _NodeState:
     tried: list[str] = field(default_factory=list)
 
 
+class Cancelled(RuntimeError):
+    """Raised inside the loop when a caller asks the run to stop."""
+
+
 class Arborist:
     def __init__(
         self,
@@ -138,6 +143,24 @@ class Arborist:
         self._setup_seconds = 0.0
         self._invalid_patches = 0
         self._stalls = 0
+        self._cancel = threading.Event()
+
+    def cancel(self) -> None:
+        """Ask the run to stop at the next boundary.
+
+        Checked before every model call and every sandbox execution, so a stop
+        takes effect within one step instead of letting the search spend the
+        rest of its budget on work nobody is waiting for.
+        """
+        self._cancel.set()
+
+    @property
+    def cancelled(self) -> bool:
+        return self._cancel.is_set()
+
+    def _check_cancelled(self) -> None:
+        if self._cancel.is_set():
+            raise Cancelled("run was cancelled")
 
     # -- plumbing -----------------------------------------------------------
     def _emit(self, kind: str, **payload) -> None:
@@ -258,6 +281,7 @@ class Arborist:
 
         try:
             while len(self.nodes) - 1 < self.settings.max_nodes:
+                self._check_cancelled()
                 candidate_id = self._select(frontier)
                 if candidate_id is None:
                     break
@@ -285,6 +309,9 @@ class Arborist:
                 self._stalls = 0 if improved else self._stalls + 1
                 self._emit("progress", best_score=self._states[best_id].node.score, stalls=self._stalls)
 
+        except Cancelled:
+            error = "stopped by request"
+            self._emit("cancelled", message=error)
         except BudgetExceeded as exc:
             error = str(exc)
             self._emit("budget_exceeded", message=error)
@@ -330,6 +357,7 @@ class Arborist:
         wanted += _guess_files(parent.report, parent.files)
         context = select_context(parent.files, wanted or sorted(parent.files))
 
+        self._check_cancelled()
         self._emit("diagnosing", node_id=node.id, tier=tier)
         hypotheses, meta = diagnose(
             self.llm,
@@ -407,6 +435,7 @@ class Arborist:
         started = time.time()
 
         try:
+            self._check_cancelled()
             edits, explanation = propose_patch(
                 self.llm,
                 tier="nano",
@@ -419,7 +448,7 @@ class Arborist:
                 sources=context,
                 evidence=meta.get("evidence", ""),
             )
-        except BudgetExceeded:
+        except (BudgetExceeded, Cancelled):
             raise
         except Exception as exc:  # noqa: BLE001
             node.status = "invalid"
@@ -556,6 +585,7 @@ class Arborist:
                 self._setup_seconds * max(0, len(evaluated) - 1) if self.settings.branching else 0.0, 2
             ),
             "nodes": len(self.nodes),
+            "cancelled": self._cancel.is_set(),
             "patches_evaluated": len(evaluated),
             "invalid_patches": self._invalid_patches,
             "forks": getattr(self.backend, "fork_count", None),

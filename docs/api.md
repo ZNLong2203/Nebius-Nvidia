@@ -37,6 +37,23 @@ defaults in [`config.py`](../arborist/config.py).
 
 `400` if `repo_path` is not a directory.
 
+## `POST /api/runs/{run_id}/cancel`
+
+Stop a run.
+
+```json
+{ "run_id": "run-19a3f0c81b2", "cancelling": true }
+```
+
+Closing the event stream only stops *watching* — the search carries on spending
+tokens on work nobody is waiting for. This sets a flag the loop checks before
+every model call and every sandbox execution, so a stop takes effect within one
+step. Whatever the search found first is kept: the run finishes normally with
+`error: "stopped by request"` and `stats.cancelled: true`.
+
+`404` for an unknown id. A stop that arrives before the run thread has built its
+agent is remembered and applied when it does.
+
 ## `GET /api/runs`
 
 ```json

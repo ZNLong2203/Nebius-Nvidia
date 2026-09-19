@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getDemo, getHealth, getRun, startRun, streamRun } from "./api";
+import { cancelRun, getDemo, getHealth, getRun, startRun, streamRun } from "./api";
 import type { Health, RunEvent, RunResult, SearchNode, StartRunRequest } from "./types";
 
 export interface Activity {
@@ -17,6 +17,7 @@ export interface RunState {
   nodes: SearchNode[];
   result: RunResult | null;
   running: boolean;
+  stopping: boolean;
   recorded: { source: string; at: number | null } | null;
   health: Health | null;
   activity: Activity[];
@@ -28,6 +29,7 @@ const EMPTY: RunState = {
   nodes: [],
   result: null,
   running: false,
+  stopping: false,
   recorded: null,
   health: null,
   activity: [],
@@ -40,6 +42,7 @@ let activitySeq = 0;
 export function useRun() {
   const [state, setState] = useState<RunState>(EMPTY);
   const stopRef = useRef<(() => void) | null>(null);
+  const runIdRef = useRef<string | null>(null);
 
   const apply = useCallback((event: RunEvent) => {
     setState((prev) => {
@@ -104,8 +107,12 @@ export function useRun() {
           next.result = event.result;
           next.nodes = event.result.nodes;
           break;
+        case "cancelled":
+          push({ kind: "error", text: "Stopped by request" });
+          break;
         case "done":
           next.running = false;
+          next.stopping = false;
           push({ kind: "done", text: "Search finished" });
           break;
       }
@@ -117,9 +124,10 @@ export function useRun() {
   applyRef.current = apply;
 
   const attach = useCallback((runId: string) => {
+    runIdRef.current = runId;
     stopRef.current?.();
     stopRef.current = streamRun(runId, applyRef.current, () =>
-      setState((prev) => ({ ...prev, running: false })),
+      setState((prev) => ({ ...prev, running: false, stopping: false })),
     );
   }, []);
 
@@ -204,9 +212,20 @@ export function useRun() {
     [],
   );
 
+  /*
+   * Stop the run, not just the watching. The stream stays open so the tree
+   * keeps filling in until the search actually stops, which is at most one
+   * model call away -- closing it here would hide the branches already paid
+   * for.
+   */
   const stop = useCallback(() => {
-    stopRef.current?.();
-    setState((prev) => ({ ...prev, running: false }));
+    const runId = runIdRef.current;
+    setState((prev) => ({ ...prev, stopping: true }));
+    if (runId) void cancelRun(runId);
+    else {
+      stopRef.current?.();
+      setState((prev) => ({ ...prev, running: false, stopping: false }));
+    }
   }, []);
 
   return { state, start, stop };

@@ -41,6 +41,7 @@ export default function Page() {
       <CommandBar
         health={state.health}
         running={state.running}
+        stopping={state.stopping}
         onRun={(request) => {
           select(null);
           start(request);
@@ -53,6 +54,7 @@ export default function Page() {
         result={state.result}
         recorded={state.recorded}
         running={state.running}
+        stopping={state.stopping}
         error={state.error}
       />
 

@@ -188,3 +188,62 @@ def test_demo_finds_an_explicit_report_by_name_when_the_path_moved(
     body = client.get("/api/demo").json()
     assert body["available"] is True
     assert body["run"]["run_id"] == multi_branch_report["run_id"]
+
+
+# --------------------------------------------------------------------------- #
+# cancelling a run
+# --------------------------------------------------------------------------- #
+
+
+def test_cancelling_an_unknown_run_is_404(client):
+    assert client.post("/api/runs/nope/cancel").status_code == 404
+
+
+def test_cancel_stops_the_search_instead_of_only_the_watching(client, monkeypatch):
+    """Closing the event stream leaves the run spending tokens; this must not."""
+    import threading
+
+    from arborist.llm import ScriptedLLM
+
+    released = threading.Event()
+    calls = {"n": 0}
+
+    class SlowLLM(ScriptedLLM):
+        def json(self, tier, system, user, schema=None, **kw):
+            calls["n"] += 1
+            released.wait(timeout=10)
+            return {}
+
+    monkeypatch.setattr(server, "NemotronClient", lambda _s: SlowLLM())
+
+    run_id = client.post(
+        "/api/runs",
+        json={"repo_path": str(EXAMPLE), "test_command": PYTEST_CMD, "backend": "local"},
+    ).json()["run_id"]
+
+    # Wait until the search is actually inside a model call.
+    deadline = time.time() + 30
+    while calls["n"] == 0 and time.time() < deadline:
+        time.sleep(0.05)
+    assert calls["n"] > 0, "the run never reached a model call"
+
+    body = client.post(f"/api/runs/{run_id}/cancel").json()
+    assert body["cancelling"] is True
+    released.set()
+
+    payload = _wait(client, run_id)
+    assert payload["result"]["error"] == "stopped by request"
+    assert payload["result"]["stats"]["cancelled"] is True
+    # The baseline it already measured is kept rather than thrown away.
+    assert payload["result"]["baseline"]["passed"] == 5
+
+
+def test_a_stop_arriving_before_the_agent_exists_is_not_dropped(client, monkeypatch):
+    from arborist.llm import ScriptedLLM
+
+    monkeypatch.setattr(server, "NemotronClient", lambda _s: ScriptedLLM())
+    run = server._Run("run-test", server.StartRun(repo_path=str(EXAMPLE)))
+    server._RUNS["run-test"] = run
+
+    assert client.post("/api/runs/run-test/cancel").json()["cancelling"] is True
+    assert run.stop_requested is True

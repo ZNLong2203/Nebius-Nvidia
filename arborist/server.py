@@ -68,9 +68,11 @@ class _Run:
         self.events: list[dict] = []
         self.subscribers: list[queue.Queue] = []
         self.done = threading.Event()
+        self.stop_requested = False
         self.result: dict[str, Any] | None = None
         self.error: str = ""
         self.started_at = time.time()
+        self.agent: Arborist | None = None
 
     def publish(self, event: dict) -> None:
         self.events.append(event)
@@ -106,6 +108,11 @@ def _execute(run: _Run) -> None:
         backend = build_backend(settings)
         tavily = TavilyClient(api_key=settings.tavily_api_key) if settings.has_tavily else None
         agent = Arborist(settings, backend, llm, tavily, on_event=run.publish)
+        # Published before the run starts so a stop arriving mid-setup is not
+        # dropped on the floor.
+        run.agent = agent
+        if run.stop_requested:
+            agent.cancel()
         result = agent.run(
             RunConfig(
                 repo_path=req.repo_path,
@@ -137,6 +144,23 @@ def start_run(request: StartRun) -> dict:
         _RUNS[run_id] = run
     threading.Thread(target=_execute, args=(run,), daemon=True).start()
     return {"run_id": run_id}
+
+
+@app.post("/api/runs/{run_id}/cancel")
+def cancel_run(run_id: str) -> dict:
+    """Stop a run.
+
+    Closing the event stream only stops watching; the search would carry on
+    spending tokens on work nobody is waiting for. This asks it to stop at its
+    next boundary, which is at most one model call away.
+    """
+    run = _RUNS.get(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="unknown run")
+    run.stop_requested = True
+    if run.agent is not None:
+        run.agent.cancel()
+    return {"run_id": run_id, "cancelling": not run.done.is_set()}
 
 
 @app.get("/api/runs")

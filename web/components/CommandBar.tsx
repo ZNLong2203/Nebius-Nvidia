@@ -10,11 +10,13 @@ const FIELD =
 export function CommandBar({
   health,
   running,
+  stopping,
   onRun,
   onStop,
 }: {
   health: Health | null;
   running: boolean;
+  stopping: boolean;
   onRun: (request: StartRunRequest) => void;
   onStop: () => void;
 }) {
@@ -106,10 +108,15 @@ export function CommandBar({
             <button
               type="button"
               onClick={onStop}
-              className="rounded-lg border border-edge px-4 py-2 text-[13px] font-semibold text-ink transition-colors hover:bg-surface-2"
+              disabled={stopping}
+              title={stopping ? "Finishing the step in flight" : "Stop the search"}
+              className="rounded-lg border border-edge px-4 py-2 text-[13px] font-semibold text-ink transition-colors hover:bg-surface-2 disabled:opacity-60"
             >
-              <span className="mr-2 inline-block size-2 animate-pulse rounded-full bg-[var(--accent)]" />
-              Searching…
+              <span
+                className="mr-2 inline-block size-2 animate-pulse rounded-full"
+                style={{ background: stopping ? "var(--warning)" : "var(--accent)" }}
+              />
+              {stopping ? "Stopping…" : "Stop search"}
             </button>
           ) : (
             <button

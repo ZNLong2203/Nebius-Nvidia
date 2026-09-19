@@ -18,6 +18,13 @@ export const getDemo = () => get<DemoResponse>("/api/demo");
 export const getRun = (id: string) =>
   get<{ run_id: string; done: boolean; error: string; result: RunResult | null }>(`/api/runs/${id}`);
 
+/** Ask the server to stop a run. Closing the stream alone would not. */
+export async function cancelRun(runId: string): Promise<void> {
+  await fetch(`${base}/api/runs/${runId}/cancel`, { method: "POST" }).catch(() => {
+    /* the run may already have finished */
+  });
+}
+
 export async function startRun(request: StartRunRequest): Promise<string> {
   const response = await fetch(`${base}/api/runs`, {
     method: "POST",

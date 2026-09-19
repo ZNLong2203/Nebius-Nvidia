@@ -8,12 +8,14 @@ export function ContextStrip({
   result,
   recorded,
   running,
+  stopping,
   error,
 }: {
   health: Health | null;
   result: RunResult | null;
   recorded: { source: string; at: number | null } | null;
   running: boolean;
+  stopping: boolean;
   error: string | null;
 }) {
   if (error) {
@@ -29,13 +31,18 @@ export function ContextStrip({
 
   if (running) {
     return (
-      <Strip tone="accent">
+      <Strip tone={stopping ? "warning" : "accent"}>
         <span className="flex items-center gap-2 text-[12.5px] font-medium">
-          <span className="size-1.5 animate-pulse rounded-full bg-[var(--accent)]" />
-          Searching
+          <span
+            className="size-1.5 animate-pulse rounded-full"
+            style={{ background: stopping ? "var(--warning)" : "var(--accent)" }}
+          />
+          {stopping ? "Stopping" : "Searching"}
         </span>
         <span className="text-[12.5px] text-ink-2">
-          Branches open as rival theories are tested against the same checkpoint.
+          {stopping
+            ? "Finishing the step already in flight, then keeping everything found so far."
+            : "Branches open as rival theories are tested against the same checkpoint."}
         </span>
       </Strip>
     );

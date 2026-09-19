@@ -254,6 +254,9 @@ def _render_alternative(node: dict) -> str:
     mark = STATUS_MARK.get(node["status"], "•")
     title = (node.get("hypothesis") or {}).get("title") or node.get("note") or "patch"
 
+    report_block = node.get("report") or {}
+    passing = f"{report_block['passed']}/{report_block['total']}" if report_block else "?"
+
     if node["status"] == "regressed":
         reason = "broke " + ", ".join(f"`{t}`" for t in node.get("regressions", []))
     elif node["status"] == "invalid":
@@ -261,7 +264,10 @@ def _render_alternative(node: dict) -> str:
     elif node["status"] == "neutral":
         reason = "no test changed state"
     else:
-        reason = f"scored lower than the branch that was kept ({node.get('score', 0):.2f})"
+        # An improved branch that is not on the winning path was a real
+        # candidate -- often tied with the one that was kept. Saying it "scored
+        # lower" would be untrue.
+        reason = f"reached {passing} but its branch did not get to green"
 
     block = [f"<details><summary>{mark} <b>{title}</b> — {reason}</summary>", ""]
     if node.get("hypothesis", {}).get("rationale"):

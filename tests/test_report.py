@@ -76,6 +76,24 @@ def test_body_reports_what_the_search_cost(multi_branch_report):
     assert "1 proposed patch did not apply cleanly and was rejected before execution." in body
 
 
+def test_an_explored_branch_is_not_described_as_scoring_lower(multi_branch_report):
+    """A sibling that tied with the winner did not lose on score, and must not be said to."""
+    node = {
+        "status": "improved",
+        "score": 0.89,
+        "hypothesis": {"title": "a real candidate"},
+        "report": {"passed": 8, "total": 9},
+        "edits": [],
+        "fixed": [],
+        "regressions": [],
+    }
+    from arborist.report import _render_alternative
+
+    rendered = _render_alternative(node)
+    assert "reached 8/9 but its branch did not get to green" in rendered
+    assert "scored lower" not in rendered
+
+
 def test_body_carries_the_rejected_alternatives_with_their_reasons(multi_branch_report):
     """The whole point: a reviewer sees what was tried and why it lost."""
     body = render_pr_body(multi_branch_report)

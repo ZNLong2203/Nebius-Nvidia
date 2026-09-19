@@ -17,7 +17,7 @@ uv venv .venv -p 3.12 && uv pip install -e ".[contree,dev]"
 ## Tests
 
 ```bash
-pytest -q          # 94 tests, no network, no credentials
+pytest -q          # 109 tests, no network, no credentials
 ruff check .
 ```
 
@@ -42,6 +42,7 @@ regression detection, backtracking, the HTTP API and the CLI.
 | `tests/test_cli.py` | Exit codes, rendered output, report files |
 | `tests/test_report.py` | The pull request body: the fix, the evidence, the rejected alternatives and their reasons |
 | `tests/test_publish.py` | Branch, commit, push, `gh` — and the guard rails in front of each |
+| `tests/test_agent.py` | Hypothesis parsing, the fanout cap, the empty-diagnosis retry, malformed edits, and that a repo-local failure never reaches Tavily |
 
 `tests/conftest.py` builds `multi_branch_report` by running a **real search**
 with the scripted model: one branch that cannot be applied, one that changes
@@ -94,7 +95,7 @@ branch exists leaves the commit in place rather than unwinding it silently.
 | `NEBIUS_API_KEY` | — | Token Factory and Sandboxes |
 | `NEBIUS_BASE_URL` | `https://api.tokenfactory.nebius.com/v1/` | Inference endpoint |
 | `CONTREE_BASE_URL` | `https://api.tokenfactory.nebius.com/sandboxes` | Sandboxes endpoint |
-| `NEBIUS_PROJECT_ID` | — | Optional project scoping |
+| `NEBIUS_PROJECT_ID` | — | **Required for the contree backend** — sent as the `Project` header |
 | `TAVILY_API_KEY` | — | Enables the external-docs tool |
 | `ARBORIST_BACKEND` | `contree` | `contree` \| `local` |
 | `ARBORIST_BRANCHING` | `1` | `0` for the linear baseline |

@@ -9,9 +9,13 @@ at `https://api.tokenfactory.nebius.com/v1/`. Implemented in
 
 | Tier | Model id | Calls per iteration | Job |
 |---|---|---|---|
-| `nano` | `nvidia/nemotron-3-nano-30b-a3b` | **k** (one per candidate patch) | Write one minimal patch for one assigned hypothesis |
+| `nano` | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | **k** (one per candidate patch) | Write one minimal patch for one assigned hypothesis |
 | `super` | `nvidia/nemotron-3-super-120b-a12b` | 1 | Diagnose the failure, produce *distinct* hypotheses |
-| `ultra` | `nvidia/nemotron-3-ultra-550b-a55b` | 0 in the normal case | Escalated diagnosis when stalled; tie adjudication |
+| `ultra` | `nvidia/Nemotron-3-Ultra-550b-a55b` | 0 in the normal case | Escalated diagnosis when stalled; tie adjudication |
+
+> **The ids are case-sensitive**, and the lowercase slugs used by model
+> aggregators 404 here. `GET /v1/models` on your own account is the source of
+> truth; do not copy them from anywhere else.
 
 With the default `k = 4`, a normal iteration is **one Super call and four Nano
 calls**. The tiering is not decorative — it is the cost argument:
@@ -88,6 +92,25 @@ anything outside the assigned hypothesis — sibling branches must stay comparab
 Candidates with their hypothesis, explanation, score, fixed/broken lists and
 diff. Judged on correctness of reasoning, blast radius, and whether the change
 would survive code review.
+
+## These are reasoning models
+
+Nemotron 3 puts its chain of thought in a separate `reasoning` field and leaves
+`content` clean, so no `<think>` stripping is needed. One consequence matters:
+
+> When the token budget runs out mid-thought, `content` comes back **empty**
+> while `reasoning` is full — and the model has usually already written the
+> answer in there.
+
+`_message_text` falls back to `reasoning` for exactly that case, and the ceilings
+are set well above what a linear model would need: 6k for diagnosis, 8k for a
+patch (a whole-file rewrite needs the room), 4k for adjudication. A diagnosis
+routinely spends 2,500–2,800 completion tokens, most of it thinking.
+
+A diagnosis that still yields no hypotheses is retried once at a higher
+temperature, with the model told what was wrong with its first reply. That retry
+is cheap next to the run it rescues: an empty diagnosis at the root ends the
+whole search after the call has already been paid for.
 
 ## Structured output
 

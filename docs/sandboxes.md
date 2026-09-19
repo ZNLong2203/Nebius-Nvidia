@@ -46,8 +46,16 @@ for. `error` is reserved for the execution itself failing.
 
 ```python
 from contree_sdk import ContreeSync
+from contree_sdk.auth import IAMAuth
+from contree_sdk.config import ContreeConfig
 
-sdk   = ContreeSync(token=NEBIUS_API_KEY, base_url=CONTREE_BASE_URL)
+# The `ContreeSync(token=..., base_url=...)` shorthand leaves project_id at its
+# default, and every Sandboxes request carries a `Project` header -- without it
+# the API answers 400 before doing anything.
+sdk = ContreeSync(
+    ContreeConfig(auth=IAMAuth(token=NEBIUS_API_KEY, project_id=NEBIUS_PROJECT_ID,
+                               base_url=CONTREE_BASE_URL))
+)
 image = sdk.images.use("python:3.12-slim")
 
 staged = image.run(shell="mkdir -p /workspace && ls -la /workspace",
@@ -98,7 +106,7 @@ If you upgrade, `ContreeBackend.__init__` is the only place that needs to change
 |---|---|---|
 | `NEBIUS_API_KEY` | — | Same key as inference |
 | `CONTREE_BASE_URL` | `https://api.tokenfactory.nebius.com/sandboxes` | Sandboxes control plane |
-| `NEBIUS_PROJECT_ID` | — | Optional project scoping |
+| `NEBIUS_PROJECT_ID` | — | **Required.** Sent as the `Project` header on every request; a missing value is a 400 |
 | `ARBORIST_BACKEND` | `contree` | `contree` or `local` |
 
 The OCI image comes from `--image` (default `python:3.12-slim`). Any registry

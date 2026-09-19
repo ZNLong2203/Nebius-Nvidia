@@ -198,7 +198,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 
 ### Two backends, one contract
 
-`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 94 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
+`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 109 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
 
 ---
 
@@ -208,7 +208,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 pytest -q
 ```
 
-94 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
+109 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
 
 ---
 

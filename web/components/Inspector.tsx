@@ -2,6 +2,8 @@
 
 import { STATUS_META } from "@/lib/tree";
 import type { RunResult, SearchNode } from "@/lib/types";
+import { CodeBlock, DiffBlock, TestOutput } from "./Code";
+import { Collapsible } from "./Collapsible";
 import { Badge, Meter } from "./Primitives";
 
 export function Inspector({
@@ -17,173 +19,208 @@ export function Inspector({
 
   const meta = STATUS_META[node.status] ?? STATUS_META.running;
   const report = node.report;
+  const title =
+    node.depth === 0 ? "Starting state" : node.hypothesis?.title || node.note || "Candidate patch";
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start justify-between gap-3 border-b border-edge px-5 py-4">
-        <div className="min-w-0">
-          <Badge tone={meta.tone} icon={meta.icon}>
-            {meta.label}
-          </Badge>
-          <h2 className="mt-2 text-[15px] leading-snug font-semibold tracking-[-0.01em]">
-            {node.depth === 0
-              ? "Starting state"
-              : node.hypothesis?.title || node.note || "Candidate patch"}
-          </h2>
-          <p className="mono mt-1 text-[11px] text-ink-3">
-            depth {node.depth}
-            {node.checkpoint_id && ` · checkpoint ${node.checkpoint_id.slice(0, 12)}`}
-            {node.wall_seconds > 0 && ` · ${node.wall_seconds}s`}
-          </p>
+      {/* Sticky, and always bordered, so scrolled content never slides under it
+          without an edge to mark where the header ends. */}
+      <header className="sticky top-0 z-10 shrink-0 border-b border-edge bg-surface px-5 py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Badge tone={meta.tone} icon={meta.icon}>
+              {meta.label}
+            </Badge>
+            <h2 className="mt-2 text-[15.5px] leading-snug font-semibold tracking-[-0.01em]">
+              {title}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close inspector"
+            className="shrink-0 rounded-lg border border-edge px-2 py-1 text-[12px] text-ink-3 transition-colors hover:bg-surface-2 hover:text-ink"
+          >
+            ✕
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close inspector"
-          className="shrink-0 rounded-lg border border-edge px-2 py-1 text-[13px] text-ink-3 transition-colors hover:bg-surface-2"
-        >
-          ✕
-        </button>
-      </div>
+
+        <div className="mono mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-ink-3">
+          {[
+            `depth ${node.depth}`,
+            node.checkpoint_id ? `checkpoint ${node.checkpoint_id.slice(0, 10)}` : null,
+            node.wall_seconds > 0 ? `${node.wall_seconds.toFixed(1)}s` : null,
+            node.model_tier ? `patch by ${node.model_tier}` : null,
+          ]
+            .filter(Boolean)
+            .map((item, index) => (
+              <span key={item as string} className="flex items-center gap-2">
+                {index > 0 && <span aria-hidden className="text-line-2">·</span>}
+                {item}
+              </span>
+            ))}
+        </div>
+      </header>
 
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        {/* At a glance: the three things worth knowing before any prose. */}
         {report && (
-          <Section title="Tests">
+          <div className="mb-5 rounded-xl border border-edge bg-surface-2 px-4 py-3">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="tnum text-[22px] font-semibold">
+              <span className="tnum text-[24px] leading-none font-semibold">
                 {report.passed}
-                <span className="text-ink-3">/{report.total}</span>
+                <span className="text-[16px] text-ink-3">/{report.total}</span>
               </span>
-              <span className="text-[12px] text-ink-2">
-                {report.failed > 0 && `${report.failed} failed`}
-                {report.errors > 0 && ` · ${report.errors} errored`}
-              </span>
+              <span className="eyebrow">tests passing</span>
             </div>
-            <div className="mt-2">
+            <div className="mt-2.5">
               <Meter value={report.passed} total={report.total} tone={meta.tone} height={6} />
             </div>
-          </Section>
-        )}
-
-        {node.fixed.length > 0 && (
-          <Section title="Fixed">
-            <TestList items={node.fixed} tone="good" />
-          </Section>
-        )}
-
-        {node.regressions.length > 0 && (
-          <Section title="Broke">
-            <p className="mb-2 text-[12.5px] text-ink-2">
-              These passed at the parent state. That is what made this branch a dead end.
-            </p>
-            <TestList items={node.regressions} tone="critical" />
-          </Section>
-        )}
-
-        {report && report.failed_ids.length > 0 && (
-          <Section title="Still failing">
-            <TestList items={report.failed_ids} tone="muted" />
-          </Section>
-        )}
-
-        {node.diagnosis && (
-          <Section title="Diagnosis">
-            <p className="text-[12.5px] leading-relaxed text-ink-2">{node.diagnosis}</p>
-          </Section>
-        )}
-
-        {node.hypothesis?.rationale && (
-          <Section title="Why this theory">
-            <p className="text-[12.5px] leading-relaxed text-ink-2">{node.hypothesis.rationale}</p>
-          </Section>
-        )}
-
-        {node.explanation && (
-          <Section title="What the patch does">
-            <p className="text-[12.5px] leading-relaxed text-ink-2">{node.explanation}</p>
-          </Section>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {node.fixed.length > 0 && (
+                <Badge tone="good" icon="✓">
+                  fixed {node.fixed.length}
+                </Badge>
+              )}
+              {node.regressions.length > 0 && (
+                <Badge tone="critical" icon="↓">
+                  broke {node.regressions.length}
+                </Badge>
+              )}
+              {report.failed > 0 && (
+                <Badge tone="muted" icon="•">
+                  {report.failed} still failing
+                </Badge>
+              )}
+              {report.green && (
+                <Badge tone="good" icon="✓">
+                  suite is green
+                </Badge>
+              )}
+            </div>
+          </div>
         )}
 
         {node.note && (
-          <Section title="Note">
-            <p className="mono rounded-lg bg-surface-2 px-3 py-2 text-[11.5px] leading-relaxed text-ink-2">
-              {node.note}
+          <div
+            className="mb-5 rounded-lg border px-3 py-2.5 text-[12px] leading-relaxed"
+            style={{
+              borderColor: "color-mix(in srgb, var(--warning) 40%, transparent)",
+              background: "color-mix(in srgb, var(--warning) 8%, transparent)",
+            }}
+          >
+            <span className="eyebrow mb-1 block">Why it stopped here</span>
+            <span className="mono text-ink-2">{node.note}</span>
+          </div>
+        )}
+
+        {node.regressions.length > 0 && (
+          <Collapsible title="Tests it broke" count={node.regressions.length}>
+            <p className="mb-2 text-[12px] leading-relaxed text-ink-2">
+              These passed at the parent state. That is what made this branch a dead end — and
+              because nothing was mutated, abandoning it cost nothing.
             </p>
-          </Section>
+            <TestList items={node.regressions} tone="critical" />
+          </Collapsible>
+        )}
+
+        {node.fixed.length > 0 && (
+          <Collapsible title="Tests it fixed" count={node.fixed.length}>
+            <TestList items={node.fixed} tone="good" />
+          </Collapsible>
+        )}
+
+        {node.diagnosis && (
+          <Collapsible title="The diagnosis">
+            <p className="text-[12.5px] leading-relaxed text-ink-2">{node.diagnosis}</p>
+          </Collapsible>
+        )}
+
+        {node.hypothesis?.rationale && (
+          <Collapsible title="Why this theory">
+            <p className="text-[12.5px] leading-relaxed text-ink-2">{node.hypothesis.rationale}</p>
+          </Collapsible>
+        )}
+
+        {node.explanation && (
+          <Collapsible title="What the patch does">
+            <p className="text-[12.5px] leading-relaxed text-ink-2">{node.explanation}</p>
+          </Collapsible>
         )}
 
         {node.edits.length > 0 && (
-          <Section title={node.edits.length === 1 ? "The edit" : `${node.edits.length} edits`}>
-            {node.edits.map((edit, index) => (
-              <div key={index} className="mb-3 last:mb-0">
-                <div className="mono mb-1.5 text-[11px] text-ink-3">{edit.path}</div>
-                <Diff edit={edit} />
-              </div>
-            ))}
-          </Section>
+          <Collapsible
+            title={node.edits.length === 1 ? "The edit" : "The edits"}
+            count={node.edits.length > 1 ? node.edits.length : undefined}
+          >
+            <div className="space-y-3">
+              {node.edits.map((edit, index) =>
+                edit.new_content !== null ? (
+                  <CodeBlock key={index} source={edit.new_content} path={edit.path} />
+                ) : (
+                  <DiffBlock
+                    key={index}
+                    path={edit.path}
+                    removed={edit.search ?? ""}
+                    added={edit.replace ?? ""}
+                  />
+                ),
+              )}
+            </div>
+          </Collapsible>
+        )}
+
+        {report && report.failed_ids.length > 0 && (
+          <Collapsible
+            title="Still failing"
+            count={report.failed_ids.length}
+            defaultOpen={report.failed_ids.length <= 4}
+          >
+            <TestList items={report.failed_ids} tone="muted" />
+          </Collapsible>
         )}
 
         {node.stdout_tail && (
-          <Section title="Test output">
-            <pre className="mono scroll-thin max-h-72 overflow-auto rounded-lg border border-edge bg-plane p-3 text-[11px] leading-relaxed whitespace-pre-wrap text-ink-2">
-              {node.stdout_tail.slice(-2500)}
-            </pre>
-          </Section>
+          <Collapsible title="Test output" defaultOpen={false}>
+            <TestOutput text={node.stdout_tail.slice(-3000)} />
+          </Collapsible>
         )}
       </div>
     </div>
   );
 }
 
-function Diff({ edit }: { edit: { search: string | null; replace: string | null; new_content: string | null } }) {
-  if (edit.new_content !== null) {
-    return (
-      <pre className="mono scroll-thin max-h-60 overflow-auto rounded-lg border border-edge bg-plane p-3 text-[11px] leading-relaxed whitespace-pre-wrap text-ink-2">
-        {edit.new_content.slice(0, 2000)}
-      </pre>
-    );
-  }
-  const removed = (edit.search ?? "").split("\n");
-  const added = (edit.replace ?? "").split("\n");
-  return (
-    <pre className="mono scroll-thin max-h-60 overflow-auto rounded-lg border border-edge bg-plane p-3 text-[11px] leading-relaxed whitespace-pre-wrap">
-      {removed.map((line, index) => (
-        <div key={`r${index}`} style={{ color: "var(--critical)" }}>
-          − {line}
-        </div>
-      ))}
-      {added.map((line, index) => (
-        <div key={`a${index}`} style={{ color: "var(--good)" }}>
-          + {line}
-        </div>
-      ))}
-    </pre>
-  );
-}
-
 function TestList({ items, tone }: { items: string[]; tone: string }) {
   const colour =
     tone === "good" ? "var(--good)" : tone === "critical" ? "var(--critical)" : "var(--ink-3)";
-  return (
-    <ul className="space-y-1">
-      {items.map((item) => (
-        <li key={item} className="mono flex gap-2 text-[11px] leading-relaxed text-ink-2">
-          <span aria-hidden style={{ color: colour }}>
-            •
-          </span>
-          <span className="min-w-0 break-all">{item}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  // Every id in a list usually shares a suite. Printing it once buys each name
+  // the width it needs to sit on one line.
+  const suites = new Set(items.map((item) => (item.includes("::") ? item.split("::")[0] : "")));
+  const commonSuite = suites.size === 1 ? [...suites][0] : "";
+  const names = items.map((item) =>
+    commonSuite && item.startsWith(`${commonSuite}::`) ? item.slice(commonSuite.length + 2) : item,
+  );
+
   return (
-    <section className="mb-6 last:mb-0">
-      <h3 className="eyebrow mb-2">{title}</h3>
-      {children}
-    </section>
+    <div>
+      {commonSuite && <div className="mono mb-1 text-[10.5px] text-ink-3">{commonSuite}</div>}
+      <ul className="space-y-1">
+        {names.map((name, index) => (
+          <li key={items[index]} className="flex gap-2 text-[11.5px] leading-relaxed">
+            <span
+              aria-hidden
+              className="mt-[7px] h-1 w-1 shrink-0 rounded-full"
+              style={{ background: colour }}
+            />
+            <span className="mono min-w-0 text-ink-2 [overflow-wrap:anywhere]" title={items[index]}>
+              {name}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -191,7 +228,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Explainer({ result }: { result: RunResult | null }) {
   return (
     <div className="scroll-thin h-full overflow-y-auto px-5 py-5">
-      <h2 className="text-[15px] font-semibold tracking-[-0.01em]">How to read this</h2>
+      <h2 className="text-[15.5px] font-semibold tracking-[-0.01em]">How to read this</h2>
       <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">
         Every card is an <strong className="text-ink">immutable repository state</strong>. Moving
         right means a patch was applied <em>on top of</em> the one before it. Cards stacked
@@ -218,31 +255,49 @@ function Explainer({ result }: { result: RunResult | null }) {
         ))}
       </ul>
 
-      {result?.diff && (
-        <section className="mt-6">
-          <h3 className="eyebrow mb-2">The resulting patch</h3>
-          <pre className="mono scroll-thin max-h-[420px] overflow-auto rounded-lg border border-edge bg-plane p-3 text-[11px] leading-relaxed whitespace-pre">
-            {result.diff.split("\n").map((line, index) => (
-              <div
-                key={index}
-                style={{
-                  color: line.startsWith("+")
-                    ? "var(--good)"
-                    : line.startsWith("-")
-                      ? "var(--critical)"
-                      : line.startsWith("@@")
-                        ? "var(--accent)"
-                        : "var(--ink-2)",
-                }}
-              >
-                {line || " "}
-              </div>
-            ))}
-          </pre>
-        </section>
-      )}
+      <p className="mt-4 rounded-lg bg-surface-2 px-3 py-2 text-[12px] leading-relaxed text-ink-2">
+        Hover a card to light up everything it was built on. Select one for its patch, the tests it
+        fixed, and the tests it broke.
+      </p>
 
-      <p className="mt-6 text-[12px] text-ink-3">Select any card to see its patch and its tests.</p>
+      {result?.diff && (
+        <div className="mt-6">
+          <h3 className="eyebrow mb-2">The resulting patch</h3>
+          <UnifiedDiff diff={result.diff} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The final diff, split per file so each one is separately readable. */
+function UnifiedDiff({ diff }: { diff: string }) {
+  const files: { path: string; removed: string[]; added: string[] }[] = [];
+  let current: (typeof files)[number] | null = null;
+
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("--- a/")) {
+      current = { path: line.slice(6), removed: [], added: [] };
+      files.push(current);
+      continue;
+    }
+    if (!current || line.startsWith("+++ ") || line.startsWith("@@")) continue;
+    if (line.startsWith("-")) current.removed.push(line.slice(1));
+    else if (line.startsWith("+")) current.added.push(line.slice(1));
+  }
+
+  if (files.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      {files.map((file) => (
+        <DiffBlock
+          key={file.path}
+          path={file.path}
+          removed={file.removed.join("\n")}
+          added={file.added.join("\n")}
+        />
+      ))}
     </div>
   );
 }

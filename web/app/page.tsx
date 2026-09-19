@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { CommandBar } from "@/components/CommandBar";
 import { ContextStrip } from "@/components/ContextStrip";
@@ -13,6 +13,20 @@ import { useRun } from "@/lib/useRun";
 export default function Page() {
   const { state, start, stop } = useRun();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  /* A link can point at one branch, not just one run. */
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("node");
+    if (requested) setSelectedId(requested);
+  }, []);
+
+  const select = useCallback((id: string | null) => {
+    setSelectedId(id);
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("node", id);
+    else url.searchParams.delete("node");
+    window.history.replaceState(null, "", url);
+  }, []);
 
   const selected = useMemo(
     () => state.nodes.find((node) => node.id === selectedId) ?? null,
@@ -28,7 +42,7 @@ export default function Page() {
         health={state.health}
         running={state.running}
         onRun={(request) => {
-          setSelectedId(null);
+          select(null);
           start(request);
         }}
         onStop={stop}
@@ -53,7 +67,7 @@ export default function Page() {
               winnerId={state.result?.winner_id ?? null}
               selectedId={selectedId}
               running={state.running}
-              onSelect={(id) => setSelectedId((current) => (current === id ? null : id))}
+              onSelect={(id) => select(id === selectedId ? null : id)}
             />
           ) : (
             <EmptyState running={state.running} />
@@ -62,7 +76,7 @@ export default function Page() {
 
         <aside className="flex w-full shrink-0 flex-col border-t border-edge bg-surface lg:w-[400px] lg:border-t-0 lg:border-l xl:w-[440px]">
           <div className="min-h-0 flex-1">
-            <Inspector node={selected} result={state.result} onClose={() => setSelectedId(null)} />
+            <Inspector node={selected} result={state.result} onClose={() => select(null)} />
           </div>
           {showActivity && (
             <div className="h-[34%] max-h-[280px] min-h-[160px] shrink-0 border-t border-edge">

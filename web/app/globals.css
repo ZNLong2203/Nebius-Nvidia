@@ -31,6 +31,17 @@
   --tier-super: #2a78d6;
   --tier-ultra: #4a3aa7;
 
+
+  /* Code tokens. Same hue families as the palette, stepped for text contrast
+     on the code surface rather than for marks on a chart. */
+  --tok-comment: #74726c;
+  --tok-string: #0f7d57;
+  --tok-keyword: #4a3aa7;
+  --tok-builtin: #a83a68;
+  --tok-number: #b4471f;
+  --tok-func: #1c5cab;
+  --tok-decorator: #8a6100;
+
   --shadow-1: 0 1px 2px rgba(11, 11, 11, 0.05);
   --shadow-2: 0 4px 16px -4px rgba(11, 11, 11, 0.12), 0 1px 3px rgba(11, 11, 11, 0.06);
   --shadow-3: 0 16px 48px -12px rgba(11, 11, 11, 0.22);
@@ -57,6 +68,15 @@
     --tier-super: #3987e5;
     --tier-ultra: #9085e9;
 
+
+    --tok-comment: #7d7b75;
+    --tok-string: #35c795;
+    --tok-keyword: #9085e9;
+    --tok-builtin: #e87ba4;
+    --tok-number: #f08a5f;
+    --tok-func: #6da7ec;
+    --tok-decorator: #eda100;
+
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-2: 0 4px 16px -4px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
     --shadow-3: 0 16px 48px -12px rgba(0, 0, 0, 0.7);
@@ -82,6 +102,15 @@
   --tier-nano: #199e70;
   --tier-super: #3987e5;
   --tier-ultra: #9085e9;
+
+
+  --tok-comment: #7d7b75;
+  --tok-string: #35c795;
+  --tok-keyword: #9085e9;
+  --tok-builtin: #e87ba4;
+  --tok-number: #f08a5f;
+  --tok-func: #6da7ec;
+  --tok-decorator: #eda100;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-2: 0 4px 16px -4px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);

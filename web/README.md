@@ -53,10 +53,28 @@ architecture's whole claim, visible without reading a table.
 | `lib/api.ts` | The five endpoints and the event stream |
 | `components/SearchTree.tsx` | The tree: SVG, enter animations, hover ancestry |
 | `components/Inspector.tsx` | One node in full — patch, tests fixed, tests broken |
+| `components/Code.tsx` | Highlighted diffs, files and pytest output, with copy buttons |
+| `lib/highlight.ts` | The highlighter: ~150 lines, no dependency |
 | `components/SpendStrip.tsx` | Tokens per tier, branches, sandbox runs, time saved |
 | `components/ActivityFeed.tsx` | What the agent is doing, with the tier that did it |
 
+## Reading a patch
+
+Diffs are syntax-highlighted by a **150-line tokeniser in `lib/highlight.ts`**,
+not a grammar engine. A full highlighter is hundreds of kilobytes for something
+that only ever renders short patches; this covers Python properly — including
+docstrings that span lines, which every patch here has — and degrades sensibly
+for anything C-like.
+
+The lines carry a red or green tint for their side of the change *and* keep
+their token colours, because solid red and green tells you where the change is
+and nothing about what it says. Token colours are stepped per theme and checked
+against the code surface: the thinnest is 4.56:1 in light mode and 4.59:1 in
+dark.
+
 ## Linkable runs
 
-Starting a search puts `?run=<id>` in the URL, and opening that link attaches to
-the run — live if it is still going, replayed from its report if it finished.
+Starting a search puts `?run=<id>` in the URL, and selecting a branch adds
+`?node=<id>`. Opening that link attaches to the run — live if it is still going,
+replayed from its report if it finished — with that branch already open. So a
+link can point at one specific rejected patch and the tests it broke.

@@ -134,7 +134,49 @@ def test_select_context_honours_order_and_budget():
 
 def test_select_context_supports_globs():
     files = {"src/x.py": "1", "src/y.py": "2", "docs/z.md": "3"}
-    assert set(select_context(files, ["src/*.py"])) == {"src/x.py", "src/y.py"}
+    chosen = select_context(files, ["src/*.py"], fill=False)
+    assert set(chosen) == {"src/x.py", "src/y.py"}
+
+
+def test_select_context_fills_the_rest_of_the_budget():
+    """A heuristic that names two files must not hide the rest of the repo.
+
+    A model asked to patch a file it was never shown will invent one, so any
+    leftover budget goes to whatever else fits.
+    """
+    files = {"src/x.py": "1", "src/y.py": "2", "docs/z.md": "3"}
+    chosen = select_context(files, ["src/x.py"])
+    assert next(iter(chosen)) == "src/x.py", "the named file still comes first"
+    assert set(chosen) == set(files)
+
+
+def test_select_context_fill_respects_the_budget():
+    files = {"a.py": "x" * 100, "big.py": "y" * 500}
+    chosen = select_context(files, ["a.py"], budget_chars=200)
+    assert set(chosen) == {"a.py"}
+
+
+def test_apply_edits_recovers_a_path_missing_its_source_root():
+    """Models drop `src/` often enough to be worth recovering."""
+    files = {"src/billing/money.py": SAMPLE}
+    out = apply_edits(
+        files, [Edit(path="billing/money.py", search="    return a - b", replace="    return a + b")]
+    )
+    assert "return a + b" in out["src/billing/money.py"]
+    assert "billing/money.py" not in out, "the shortened path must not become a second file"
+
+
+def test_apply_edits_recovers_a_bare_filename():
+    files = {"src/deep/util.py": SAMPLE}
+    out = apply_edits(files, [Edit(path="util.py", search="    return a - b", replace="    return a + b")])
+    assert "return a + b" in out["src/deep/util.py"]
+
+
+def test_apply_edits_refuses_an_ambiguous_shortened_path():
+    """A guess that could mean two files is worse than a rejected patch."""
+    files = {"a/util.py": SAMPLE, "b/util.py": SAMPLE}
+    with pytest.raises(PatchError, match="file not found"):
+        apply_edits(files, [Edit(path="util.py", search="    return a - b", replace="    return a + b")])
 
 
 def test_text_files_skips_binaries():

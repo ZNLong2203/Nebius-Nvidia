@@ -117,8 +117,10 @@ def fix(
     finally:
         sandbox.close()
 
-    _print_result(result)
+    # Persist before rendering: a run that cost tokens and minutes must not be
+    # lost to a broken pipe or a terminal that cannot draw the tree.
     path = write_report(result, out)
+    _print_result(result)
     console.print(f"\nreport: [bold]{path}[/]")
     raise typer.Exit(code=0 if result.solved else 1)
 

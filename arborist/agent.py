@@ -155,7 +155,9 @@ SOURCE
 {attempts}
 Produce at most {fanout} hypotheses, ordered most to least likely."""
 
-    data = llm.json("super" if tier == "super" else tier, DIAGNOSE_SYSTEM, user, DIAGNOSE_SCHEMA)
+    data = llm.json(
+        "super" if tier == "super" else tier, DIAGNOSE_SYSTEM, user, DIAGNOSE_SCHEMA, max_tokens=6000
+    )
 
     evidence = ""
     if tavily and tavily.enabled and data.get("needs_external_docs"):
@@ -170,6 +172,7 @@ Produce at most {fanout} hypotheses, ordered most to least likely."""
                     DIAGNOSE_SYSTEM,
                     user + f"\n\nEXTERNAL DOCUMENTATION (retrieved for: {query})\n{evidence[:6000]}",
                     DIAGNOSE_SCHEMA,
+                    max_tokens=6000,
                 )
 
     hypotheses: list[Hypothesis] = []
@@ -235,7 +238,7 @@ SOURCE
 
 Write the minimal patch that implements this hypothesis."""
 
-    data = llm.json(tier, PATCH_SYSTEM, user, PATCH_SCHEMA, temperature=0.35)
+    data = llm.json(tier, PATCH_SYSTEM, user, PATCH_SCHEMA, temperature=0.35, max_tokens=8000)
 
     edits: list[Edit] = []
     for raw in data.get("edits") or []:
@@ -277,4 +280,4 @@ Diff:
 {c['diff'][:4000]}"""
         )
     user = f"Test command: `{test_command}`\n\n" + "\n\n".join(rendered)
-    return llm.json("ultra", ADJUDICATE_SYSTEM, user, temperature=0.1)
+    return llm.json("ultra", ADJUDICATE_SYSTEM, user, temperature=0.1, max_tokens=4000)

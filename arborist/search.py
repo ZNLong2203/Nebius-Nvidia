@@ -370,7 +370,16 @@ class Arborist:
         hypotheses = hypotheses[: max(1, min(len(hypotheses), budget_left))]
 
         def build(hypothesis):
-            return self._evaluate(cfg, parent, hypothesis, context, meta, linear_base)
+            # Each branch gets the shared diagnosis context plus the files its
+            # own hypothesis named. Without this a branch can be asked to patch
+            # a file it was never shown, and it will invent one.
+            branch_context = context
+            if hypothesis.target_files:
+                branch_context = {
+                    **select_context(parent.files, hypothesis.target_files),
+                    **context,
+                }
+            return self._evaluate(cfg, parent, hypothesis, branch_context, meta, linear_base)
 
         if len(hypotheses) == 1:
             results = [build(hypotheses[0])]
@@ -387,7 +396,7 @@ class Arborist:
             parent_id=parent.node.id,
             depth=parent.node.depth + 1,
             hypothesis=hypothesis,
-            diagnosis=meta.get("root_cause", ""),
+            diagnosis=meta.get("root_cause") or hypothesis.rationale,
             model_tier="nano",
         )
         started = time.time()

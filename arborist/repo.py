@@ -60,12 +60,17 @@ def select_context(
     wanted: list[str],
     *,
     budget_chars: int = 60_000,
+    fill: bool = True,
 ) -> dict[str, str]:
     """Pick the files worth putting in a prompt.
 
     Explicitly named paths win; glob patterns are honoured so a model may ask
     for ``src/billing/*.py``. Anything that does not fit the budget is dropped
     from the end, so the first-named file is always present.
+
+    ``fill`` then spends whatever budget is left on the rest of the repository.
+    Without it, a heuristic that names two files silently hides everything else,
+    and a model asked to patch a file it was never shown will invent one.
     """
     chosen: dict[str, str] = {}
     used = 0
@@ -78,6 +83,16 @@ def select_context(
         )
         for path in matches:
             if path in chosen or path not in files:
+                continue
+            body = files[path]
+            if used + len(body) > budget_chars:
+                continue
+            chosen[path] = body
+            used += len(body)
+
+    if fill:
+        for path in sorted(files):
+            if path in chosen:
                 continue
             body = files[path]
             if used + len(body) > budget_chars:
@@ -122,7 +137,10 @@ def apply_edits(files: dict[str, str], edits: list[Edit]) -> dict[str, str]:
         if edit.search is None or edit.replace is None:
             raise PatchError(f"{path}: edit needs either search/replace or new_content")
         if path not in updated:
-            raise PatchError(f"{path}: file not found in repository")
+            resolved = _resolve_path(path, updated)
+            if resolved is None:
+                raise PatchError(f"{path}: file not found in repository")
+            path = resolved
 
         body = updated[path]
         occurrences = body.count(edit.search)
@@ -140,6 +158,21 @@ def apply_edits(files: dict[str, str], edits: list[Edit]) -> dict[str, str]:
     if updated == files:
         raise PatchError("patch is a no-op")
     return updated
+
+
+def _resolve_path(path: str, files: dict[str, str]) -> str | None:
+    """Match a path the model shortened, when exactly one file can be meant.
+
+    Models drop a source root -- ``billing/money.py`` for ``src/billing/money.py``
+    -- often enough to be worth recovering. Only an unambiguous match counts; a
+    guess that could mean two files is worse than a rejected patch.
+    """
+    candidates = [p for p in files if p.endswith("/" + path)]
+    if len(candidates) == 1:
+        return candidates[0]
+    tail = path.rsplit("/", 1)[-1]
+    candidates = [p for p in files if p.rsplit("/", 1)[-1] == tail]
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _relaxed_find(body: str, needle: str) -> tuple[int, int] | None:

@@ -17,9 +17,12 @@ load_dotenv()
 # split is cost: Nano does the wide, throwaway work (one call per candidate
 # patch), Super does the single reasoning-heavy diagnosis per node, and Ultra is
 # only woken up when the search is genuinely stuck or two branches tie.
-MODEL_NANO = "nvidia/nemotron-3-nano-30b-a3b"
+# Exactly as Token Factory serves them -- `GET /v1/models` is the source of
+# truth and the ids are case-sensitive. The lowercase slugs used by model
+# aggregators 404 here.
+MODEL_NANO = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
 MODEL_SUPER = "nvidia/nemotron-3-super-120b-a12b"
-MODEL_ULTRA = "nvidia/nemotron-3-ultra-550b-a55b"
+MODEL_ULTRA = "nvidia/Nemotron-3-Ultra-550b-a55b"
 
 TIERS = {"nano": MODEL_NANO, "super": MODEL_SUPER, "ultra": MODEL_ULTRA}
 

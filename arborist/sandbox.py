@@ -89,9 +89,11 @@ class ContreeBackend:
 
     name = "contree"
 
-    def __init__(self, token: str, base_url: str, timeout: float = 900.0) -> None:
+    def __init__(self, token: str, base_url: str, project_id: str = "", timeout: float = 900.0) -> None:
         try:
             from contree_sdk import ContreeSync
+            from contree_sdk.auth import IAMAuth
+            from contree_sdk.config import ContreeConfig
         except ImportError as exc:  # pragma: no cover - dependency guard
             raise RuntimeError(
                 "contree-sdk is not installed. Install it with: pip install 'arborist[contree]'"
@@ -99,8 +101,21 @@ class ContreeBackend:
 
         if not token:
             raise RuntimeError("NEBIUS_API_KEY is required for the contree backend.")
+        if not project_id:
+            # Every Sandboxes request carries a `Project` header; without it the
+            # API answers 400 before doing anything, which is a confusing way to
+            # learn that one environment variable is missing.
+            raise RuntimeError(
+                "NEBIUS_PROJECT_ID is required for the contree backend -- Sandboxes scopes "
+                "every request to a project. Find it in the Nebius Token Factory console "
+                "(it looks like `project-e00abc...`) and add it to .env."
+            )
 
-        self._sdk = ContreeSync(token=token, base_url=base_url)
+        # The shorthand `ContreeSync(token=..., base_url=...)` leaves project_id
+        # at its default, so the auth object has to be built in full.
+        self._sdk = ContreeSync(
+            ContreeConfig(auth=IAMAuth(token=token, project_id=project_id, base_url=base_url))
+        )
         self._timeout = timeout
         self._forks = 0
 
@@ -300,5 +315,6 @@ def build_backend(settings) -> Backend:
     return ContreeBackend(
         token=settings.nebius_api_key,
         base_url=settings.contree_base_url,
+        project_id=settings.nebius_project_id,
         timeout=settings.exec_timeout,
     )

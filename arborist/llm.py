@@ -133,7 +133,7 @@ class NemotronClient:
             kwargs["response_format"] = response_format
         response = self._client.chat.completions.create(**kwargs)
         self._charge(tier, response)
-        return response.choices[0].message.content or ""
+        return _message_text(response)
 
     def text(self, tier: str, system: str, user: str, **kw) -> str:
         return self._chat(tier, system, user, **kw)
@@ -156,6 +156,26 @@ class NemotronClient:
         except Exception:  # noqa: BLE001 - retry once without the strict format
             raw = self._chat(tier, system, user, response_format={"type": "json_object"}, **kw)
         return parse_json(raw)
+
+
+def _message_text(response) -> str:
+    """Pull the answer out of a Nemotron response.
+
+    These are reasoning models: the chain of thought arrives in a separate
+    ``reasoning`` field and ``content`` holds the clean answer. But when the
+    token budget runs out mid-thought, ``content`` comes back empty while
+    ``reasoning`` is full -- and the model has usually already written the
+    answer in there. Falling back to it rescues a branch that would otherwise
+    be lost to a truncation.
+    """
+    choice = response.choices[0]
+    content = (choice.message.content or "").strip()
+    if content:
+        return content
+    reasoning = getattr(choice.message, "reasoning", None) or getattr(
+        choice.message, "reasoning_content", None
+    )
+    return (reasoning or "").strip()
 
 
 def parse_json(raw: str) -> dict:

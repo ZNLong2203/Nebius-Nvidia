@@ -65,6 +65,10 @@ run in its own sandbox branch. Two hypotheses that would produce the same edit
 are wasted branches -- make them genuinely different theories of the bug.
 
 Rules:
+- The SOURCE you are shown is the CURRENT state of the repository, including
+  every patch already applied on this branch. Read it before theorising: a fix
+  that is already present is not a hypothesis, and re-applying one breaks
+  working code.
 - Ground every claim in the failure output or the source you were shown. Never
   invent a file, symbol or line you have not seen.
 - Prefer fixing the source under test, not the test, unless the failure output
@@ -136,10 +140,13 @@ def diagnose(
     """Ask a model why the suite is red and how the repair could branch."""
     attempts = ""
     if parent_attempts:
+        # Ahead of the source, not buried after it: this is the context most
+        # likely to stop the model re-proposing a change that is already applied.
         attempts = (
-            "\nAlready tried on this branch (do not repeat these):\n"
+            "ALREADY TRIED ON THIS BRANCH -- these changes are already in the source "
+            "below, or were rejected. Do not propose any of them again:\n"
             + "\n".join(f"- {a}" for a in parent_attempts)
-            + "\n"
+            + "\n\n"
         )
 
     user = f"""Test command: `{test_command}`
@@ -150,10 +157,11 @@ FAILURE OUTPUT
 REPOSITORY FILES
 {", ".join(file_index[:200])}
 
-SOURCE
+{attempts}SOURCE (current state of the branch)
 {render_context(sources)}
-{attempts}
-Produce at most {fanout} hypotheses, ordered most to least likely."""
+
+Produce at most {fanout} hypotheses, ordered most to least likely.
+Each one must address a failure that is STILL failing in the output above."""
 
     data = llm.json(
         "super" if tier == "super" else tier, DIAGNOSE_SYSTEM, user, DIAGNOSE_SCHEMA, max_tokens=6000

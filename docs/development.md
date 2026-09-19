@@ -116,9 +116,14 @@ the immutability invariant, and register it in `build_backend`. Then run
 ## Adding an eval case
 
 1. Create `evals/cases/<name>/` with a repo whose tests fail.
-2. Add an entry to `CASES` in [`evals/run_eval.py`](../evals/run_eval.py) with its
+2. Describe it in [`evals/README.md`](../evals/README.md) — **not inside the case
+   directory**. Everything inside a case is loaded into the agent's context, so a
+   README that names the bug is an answer key and a result obtained by reading
+   one measures nothing. A case states the *expected* behaviour in docstrings and
+   test names, and nothing about the defect.
+3. Add an entry to `CASES` in [`evals/run_eval.py`](../evals/run_eval.py) with its
    path, test command, setup command, and the number of distinct bugs.
-3. `python evals/run_eval.py --cases <name>`
+4. `python evals/run_eval.py --cases <name>`
 
 A good case isolates one property of the search:
 

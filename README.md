@@ -154,7 +154,10 @@ python evals/run_eval.py --cases all
 
 Runs every case twice under an identical budget, branching on and off, and writes `evals/results.md` with: solved yes/no, tests passing before and after, patches evaluated, sandbox executions, **how many times setup had to run**, invalid patches, wall time, and tokens per tier.
 
-Three cases ship, each testing a different property:
+Three cases ship, each testing a different property. The answer keys live in
+[`evals/README.md`](evals/README.md), never inside a case — anything inside is
+loaded into the agent's context, and a demo that reads its own answer key proves
+nothing:
 
 | Case | The situation | What it measures |
 |---|---|---|

@@ -1,0 +1,65 @@
+# Evals
+
+```bash
+python evals/run_eval.py --cases all
+```
+
+Every case runs twice under an identical budget — branching on and off — and the
+results land in `results.md`: solved yes/no, tests passing before and after,
+patches evaluated, sandbox executions, **how many times setup had to run**,
+invalid patches, wall time, and tokens per tier.
+
+## The rule for a case
+
+**The answer key lives in this file, never inside the case directory.**
+Everything inside a case is loaded into the agent's context, so a README that
+names the bug is an answer key, and a result obtained by reading one measures
+nothing. A case states the *expected behaviour* in docstrings and test names,
+and nothing about the defect.
+
+The second trap is a case the model can solve from its priors without reading
+anything. Guard against it by making the *obvious* fix insufficient.
+
+## The cases
+
+### `broken-invoice` — depth
+
+Three independent bugs in three files (see [`../examples/README.md`](../examples/README.md)).
+No single edit fixes all three and none masks another, so the search must keep a
+partial repair and build on it. Green is reached at depth 3.
+
+### `regression-trap` — backtracking
+
+A bounded TTL cache with two red tests whose obvious fixes fight each other.
+
+- One test wants `get` to drop an expired entry. Easy, one line.
+- The other wants a recently read entry to survive eviction. The one-line fix for
+  *that* is to refresh the timestamp on read — which makes entries look young
+  forever and destroys expiry.
+
+Each fix in isolation looks like progress and the second undoes the first. A
+linear agent takes the bait and carries the damage forward. A search that scores
+against the parent's **test identities** sees the regression, abandons the
+branch, and returns to the sibling with the earlier repair intact.
+
+### `outside-knowledge` — knowing when to look it up
+
+An order model written against Pydantic 1.x, in a project whose pin has moved to
+2.x. Nothing in the tree records what `@root_validator` and `@validator` became;
+a repo-local agent can read every file and still not know. This is the class of
+failure the Tavily lookup exists for.
+
+It also punishes the lazy fix. The error names `skip_on_failure=True`, and adding
+it makes the exception go away — but the deprecated API stays, and the project
+fails on `DeprecationWarning`:
+
+| Patch | Result |
+|---|---|
+| as shipped | collection error |
+| `@root_validator(skip_on_failure=True)` | **still fails** — deprecated API, warning is fatal |
+| `@model_validator(mode="after")` **and** `@field_validator` | 4 passed |
+
+No partial credit is available: until both decorators are migrated the suite does
+not collect, so every branch scores zero. That makes this the opposite of
+`broken-invoice` — the only thing that helps is **breadth**, several rival
+migrations evaluated from one prepared checkpoint.

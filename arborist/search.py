@@ -55,6 +55,7 @@ from .tools.tavily import TavilyClient
 # its own state.
 JUNIT_PATH = ".arborist/report.xml"
 REGRESSION_WEIGHT = 0.6
+MAX_EXPANSIONS_PER_NODE = 3
 TIE_EPSILON = 1e-6
 STALL_LIMIT = 2
 
@@ -141,6 +142,7 @@ class Arborist:
         self._sandbox_runs = 0
         self._sandbox_seconds = 0.0
         self._setup_seconds = 0.0
+        self._setup_runs = 0
         self._invalid_patches = 0
         self._stalls = 0
         self._cancel = threading.Event()
@@ -223,6 +225,7 @@ class Arborist:
         command = f"rm -f {JUNIT_PATH} ; {cfg.instrumented_test_command}"
         if prefix:
             command = f"{prefix} ; {command}"
+            self._setup_runs += 1
         result = self.backend.run(checkpoint, command, files=files)
         self._sandbox_runs += 1
         self._sandbox_seconds += result.seconds
@@ -257,6 +260,7 @@ class Arborist:
             setup = self.backend.run(base_cp, cfg.setup_command)
             self._setup_seconds = time.time() - t0
             self._sandbox_runs += 1
+            self._setup_runs += 1
             if setup.error:
                 return self._bail(run_id, f"setup failed: {setup.error}", started)
             base_cp = setup.checkpoint
@@ -295,12 +299,14 @@ class Arborist:
                     break
                 parent_state = self._states[candidate_id]
                 parent_state.node.expanded = True
+                parent_state.node.expansions += 1
                 self._update(parent_state.node)
 
                 children = self._expand(cfg, parent_state, linear_base)
                 if not children:
                     frontier = [nid for nid in frontier if nid != candidate_id]
                     continue
+
 
                 improved = False
                 for child_id in children:
@@ -313,7 +319,10 @@ class Arborist:
                     if child.status in {"improved", "neutral"}:
                         frontier.append(child_id)
 
-                frontier = [nid for nid in frontier if nid != candidate_id]
+                # The node stays in the frontier: it may be worth another set
+                # of hypotheses once its first children are in.
+                if parent_state.node.expansions >= MAX_EXPANSIONS_PER_NODE:
+                    frontier = [nid for nid in frontier if nid != candidate_id]
                 self._stalls = 0 if improved else self._stalls + 1
                 self._emit("progress", best_score=self._states[best_id].node.score, stalls=self._stalls)
 
@@ -346,16 +355,27 @@ class Arborist:
         among equal scores the shallower node wins: its siblings are cheaper to
         reach and more likely to be independent theories rather than
         refinements of one.
+
+        When nothing is unexpanded, the best node so far is tried again rather
+        than ending the run with budget left. Every expansion is told what this
+        branch already attempted, so a revisit asks for different theories. This
+        matters most without branching: one bad patch used to empty the frontier
+        and stop a search that had spent a fraction of its budget -- which made
+        the baseline look like it lost on merit when it had simply been cut off.
         """
-        live = [
-            nid
+        candidates = [
+            self._states[nid].node
             for nid in dict.fromkeys(frontier)
-            if not self._states[nid].node.expanded
-            and self._states[nid].node.depth < self.settings.max_depth
+            if self._states[nid].node.depth < self.settings.max_depth
         ]
-        if not live:
+        fresh = [n for n in candidates if not n.expanded]
+        if fresh:
+            return max(fresh, key=lambda n: (n.score, -n.depth)).id
+
+        revisitable = [n for n in candidates if n.expansions < MAX_EXPANSIONS_PER_NODE]
+        if not revisitable:
             return None
-        return max(live, key=lambda nid: (self._states[nid].node.score, -self._states[nid].node.depth))
+        return max(revisitable, key=lambda n: (n.score, -n.expansions, -n.depth)).id
 
     # -- expansion ----------------------------------------------------------
     def _expand(self, cfg: RunConfig, parent: _NodeState, linear_base: Checkpoint) -> list[str]:
@@ -629,9 +649,15 @@ class Arborist:
             "sandbox_executions": self._sandbox_runs,
             "sandbox_seconds": round(self._sandbox_seconds, 2),
             "setup_seconds": round(self._setup_seconds, 2),
-            "setup_runs": 1 if self.settings.branching else max(1, len(evaluated)),
+            "setup_runs": self._setup_runs,
+            # What forking saved: the setup time that would have been paid again
+            # had every evaluation rebuilt its environment, measured against the
+            # evaluations that actually happened.
             "setup_seconds_saved": round(
-                self._setup_seconds * max(0, len(evaluated) - 1) if self.settings.branching else 0.0, 2
+                self._setup_seconds * max(0, len(evaluated) - (self._setup_runs - 1))
+                if self.settings.branching
+                else 0.0,
+                2,
             ),
             "nodes": len(self.nodes),
             "cancelled": self._cancel.is_set(),

@@ -103,11 +103,19 @@ def run_case(
     model_set: str = "nemotron",
     reports_dir: Path | None = None,
 ) -> Row:
+    # Both arms get the same patch budget.
+    #
+    # The linear arm evaluates one hypothesis per expansion, so a shared
+    # max_depth would cap it at `max_depth` patches however large max_nodes is
+    # -- four against the branching arm's twelve, which is not the same budget
+    # and was quietly deciding the comparison. Depth is therefore only a
+    # constraint on the arm that fans out.
     settings = load_settings(
         backend=backend_name,
         branching=branching,
         fanout=fanout if branching else 1,
         max_nodes=max_nodes,
+        max_depth=None if branching else max_nodes,
         models=dict(MODEL_SETS[model_set]),
     )
     llm = NemotronClient(settings)

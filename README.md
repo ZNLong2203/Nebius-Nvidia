@@ -97,14 +97,23 @@ All three are served through **Nebius Token Factory**'s OpenAI-compatible endpoi
 ## Quick start
 
 ```bash
-git clone <this repo> && cd arborist
+git clone https://github.com/ZNLong2203/Nebius-Nvidia.git
+cd Nebius-Nvidia
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[contree,dev]"
 
 cp .env.example .env     # add NEBIUS_API_KEY (and TAVILY_API_KEY if you have one)
+pytest -q                # 134 tests, no key needed — everything runs offline
 ```
 
 Get a key at [tokenfactory.nebius.com](https://tokenfactory.nebius.com). Hackathon participants get $25 in credits with the code `NEBIUS-DEVPOST-GLOBAL26`.
+
+`.env.example` starts on the **local** backend, which runs commands in directory
+snapshots and needs nothing but an inference key, so a fresh clone works
+immediately. Nebius Sandboxes — the backend this project is built around — is in
+Beta and granted per project; set `ARBORIST_BACKEND=contree` once you have it,
+and the backend will tell you plainly if you do not. See
+[docs/sandboxes.md](docs/sandboxes.md).
 
 ### Repair the bundled broken repository
 

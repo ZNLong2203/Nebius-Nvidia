@@ -115,6 +115,7 @@ class Node:
     wall_seconds: float = 0.0
     created_at: float = field(default_factory=time.time)
     expanded: bool = False
+    expansions: int = 0
     note: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -136,6 +137,7 @@ class Node:
             "model_tier": self.model_tier,
             "wall_seconds": round(self.wall_seconds, 2),
             "expanded": self.expanded,
+            "expansions": self.expansions,
             "note": self.note,
         }
 

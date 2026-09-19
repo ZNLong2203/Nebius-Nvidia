@@ -4,7 +4,7 @@
 python evals/run_eval.py --cases all
 ```
 
-Every case runs twice under an identical budget — branching on and off — and the
+Every case runs twice under the same patch budget — branching on and off — and the
 results land in `results.md`: solved yes/no, tests passing before and after,
 patches evaluated, sandbox executions, **how many times setup had to run**,
 invalid patches, wall time, and tokens per tier.
@@ -17,6 +17,19 @@ search. The table they produce is still worth having — it caught a patch-
 application bug that was losing three of five branches — but it is not evidence
 that branching beats a linear baseline, and this file will not pretend otherwise
 until a case exists that can show it.
+
+## What "the same budget" means
+
+`max_nodes` caps how many candidate patches each arm may evaluate, and both arms
+get the same figure. Depth is only a constraint on the branching arm: the linear
+arm evaluates one hypothesis per expansion, so a shared `max_depth` would cap it
+at four patches against the other's twelve — not the same budget, and quietly
+decisive.
+
+Neither arm now ends with budget left. A node that has been expanded can be
+revisited, so one bad patch no longer empties the frontier and stops a search
+that has spent a fraction of its allowance. That used to make the linear arm
+look beaten when it had simply been cut off.
 
 ## The rule for a case
 

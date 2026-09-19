@@ -432,3 +432,61 @@ def test_a_branch_whose_tests_never_ran_is_not_scored_with_its_parents_report(ba
     assert child.report is None or child.report.total == 0, (
         "the parent's passing tests must not be credited to a branch that never ran them"
     )
+
+
+def test_a_node_is_revisited_rather_than_ending_a_run_with_budget_left(backend):
+    """One bad patch used to empty the frontier and stop the search early."""
+    bad = {
+        "explanation": "regresses",
+        "edits": [
+            {
+                "path": "src/billing/money.py",
+                "search": "    return value * (percent / 100.0)",
+                "replace": "    return value * percent",
+            }
+        ],
+    }
+    good = {
+        "explanation": "the real fix",
+        "edits": [{"path": "src/billing/money.py", "new_content": MONEY_FIXED}],
+    }
+    llm = ScriptedLLM(
+        responses={
+            "super": [_diagnosis("first theory", "src/billing/money.py")] * 3,
+            "nano": [bad, good],
+        }
+    )
+    settings = load_settings(backend="local", fanout=1, max_nodes=4, max_depth=3)
+    result = Arborist(settings, backend, llm).run(
+        RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD)
+    )
+
+    root = result.nodes[0]
+    assert root.expansions >= 2, "the root should have been tried again after its child regressed"
+    assert result.stats["patches_evaluated"] >= 2, "the run must not stop with budget unspent"
+
+
+def test_setup_runs_are_counted_not_inferred(backend):
+    llm = _scripted_repair_sequence()
+    settings = load_settings(backend="local", fanout=1, max_nodes=8, max_depth=5)
+    result = Arborist(settings, backend, llm).run(
+        RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD, setup_command="true")
+    )
+    assert result.stats["setup_runs"] == 1, "with branching the prefix runs once and is forked"
+
+
+def test_without_branching_setup_runs_once_per_evaluation(backend):
+    llm = ScriptedLLM(
+        responses={
+            "super": [_diagnosis("try something", "src/billing/money.py")] * 3,
+            "nano": [
+                {"edits": [{"path": "src/billing/money.py", "new_content": MONEY_FIXED}]},
+            ],
+        }
+    )
+    settings = load_settings(backend="local", branching=False, fanout=1, max_nodes=2, max_depth=2)
+    result = Arborist(settings, backend, llm).run(
+        RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD, setup_command="true")
+    )
+    assert result.stats["setup_runs"] >= 2, "each attempt rebuilds its environment"
+    assert result.stats["setup_seconds_saved"] == 0.0

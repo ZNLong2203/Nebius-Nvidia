@@ -100,6 +100,34 @@ contree = ["contree-sdk==0.3.6"]
 
 If you upgrade, `ContreeBackend.__init__` is the only place that needs to change.
 
+## Access is Beta-gated — check this first
+
+Sandboxes is in Beta and rights are granted per project. A key that works
+perfectly for inference can have every Sandboxes permission denied:
+
+```python
+>>> sdk.get_token_info().permissions
+{'import': False, 'spawn': False, 'spawn_disposable': False,
+ 'list': False, 'cancel': False, 'set_image_tag': False}
+```
+
+The API's own answer to this is a bare `403 You do not have permission to
+perform this action`, several seconds into a run, with nothing to say the
+feature is gated rather than the request malformed. `ContreeBackend` therefore
+runs a **preflight** on construction: it calls `whoami`, checks for `spawn` and
+`import`, and fails immediately with what is missing and how to get it
+(contree@nebius.com, or the Nebius Discord).
+
+Two things that look like problems and are not:
+
+- **`Token expires in 0 hours`** — the SDK warns because the session token it
+  holds is short-lived. It rolls automatically; the underlying key is unaffected.
+- **`Missing "Project" header`** — that is `NEBIUS_PROJECT_ID`, not an auth
+  failure. See below.
+
+Until access is granted, `--backend local` exercises the identical search over
+directory snapshots.
+
 ## Configuration
 
 | Variable | Default | Meaning |

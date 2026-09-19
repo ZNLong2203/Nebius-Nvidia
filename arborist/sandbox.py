@@ -118,6 +118,33 @@ class ContreeBackend:
         )
         self._timeout = timeout
         self._forks = 0
+        self._preflight()
+
+    # Required to build a checkpoint and to fork from it. The API answers a bare
+    # 403 when they are missing, several seconds into a run, with nothing to say
+    # that the feature is gated rather than the request malformed.
+    REQUIRED_PERMISSIONS = ("spawn", "import")
+
+    def _preflight(self) -> None:
+        """Fail immediately, and legibly, when the key cannot use Sandboxes."""
+        try:
+            info = self._sdk.get_token_info()
+        except Exception as exc:
+            raise RuntimeError(
+                f"could not reach Nebius Sandboxes at {self._sdk.config.auth.base_url}: "
+                f"{type(exc).__name__}: {exc}"
+            ) from exc
+
+        permissions = dict(getattr(info, "permissions", {}) or {})
+        missing = [p for p in self.REQUIRED_PERMISSIONS if not permissions.get(p)]
+        if missing:
+            raise RuntimeError(
+                "this Nebius key has no Sandboxes permissions "
+                f"({', '.join(missing)} denied). Sandboxes is in Beta and access is granted "
+                "per project -- request it at contree@nebius.com or in the Nebius Discord. "
+                "Until then, run with `--backend local`, which uses directory snapshots and "
+                "exercises the same search."
+            )
 
     @property
     def fork_count(self) -> int:

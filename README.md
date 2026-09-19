@@ -222,7 +222,7 @@ Worth stating plainly:
 - **Python/pytest first.** The scorer parses JUnit XML, so any runner that emits it works, but only pytest has been exercised.
 - **Search quality is bounded by hypothesis diversity.** If Super returns four rephrasings of one idea, breadth buys nothing. The prompt pushes hard against this and `parent_attempts` is fed back, but it is the real ceiling.
 - **The suite is the oracle.** A bug with no failing test is invisible, and a weak suite can be satisfied by a bad patch — which is why Ultra is asked to flag suite-gaming rather than trusting the score outright.
-- **Sandboxes is in Beta.** Occasional execution failures are handled as node-level outcomes, not crashes, but they do cost a branch.
+- **Sandboxes is in Beta, and access is granted per project.** A key that works for inference can have every Sandboxes permission denied; the backend preflights for this and says so rather than failing mid-run. Execution failures once access is granted are handled as node-level outcomes, not crashes, but they do cost a branch.
 - **Pull requests are opened from the CLI, not automatically.** `arborist pr` branches, commits, pushes and calls `gh`. There is no GitHub App and nothing watches CI for you — a failing build does not yet wake the agent up.
 - **The Dockerfile has not been built in CI.** It is straightforward and the service is stateless, but treat it as untested until it runs somewhere.
 

@@ -78,3 +78,63 @@ def test_reading_a_missing_file_returns_none():
         assert backend.read(cp, "nope.txt") is None
     finally:
         backend.close()
+
+
+# --------------------------------------------------------------------------- #
+# the Nebius backend's preflight
+# --------------------------------------------------------------------------- #
+
+
+class _FakeInfo:
+    def __init__(self, permissions):
+        self.permissions = permissions
+
+
+class _FakeSdk:
+    def __init__(self, permissions=None, raises=None):
+        self._permissions = permissions or {}
+        self._raises = raises
+        self.config = type("C", (), {"auth": type("A", (), {"base_url": "https://sandboxes.test"})()})()
+
+    def get_token_info(self, refresh: bool = False):
+        if self._raises:
+            raise self._raises
+        return _FakeInfo(self._permissions)
+
+
+def _backend_with(sdk):
+    """A ContreeBackend whose SDK is stubbed, so preflight can be exercised."""
+    from arborist.sandbox import ContreeBackend
+
+    backend = ContreeBackend.__new__(ContreeBackend)
+    backend._sdk = sdk
+    backend._timeout = 1.0
+    backend._forks = 0
+    return backend
+
+
+def test_preflight_passes_when_the_key_can_spawn_and_import():
+    backend = _backend_with(_FakeSdk({"spawn": True, "import": True, "list": False}))
+    backend._preflight()  # no raise
+
+
+def test_preflight_names_the_missing_permissions_and_the_way_out():
+    """Sandboxes is Beta-gated; the API's own 403 says nothing about that."""
+    import pytest
+
+    backend = _backend_with(_FakeSdk({"spawn": False, "import": False}))
+    with pytest.raises(RuntimeError) as excinfo:
+        backend._preflight()
+
+    message = str(excinfo.value)
+    assert "spawn, import denied" in message
+    assert "Beta" in message
+    assert "--backend local" in message, "an unusable key must still leave a way to work"
+
+
+def test_preflight_reports_an_unreachable_service(monkeypatch):
+    import pytest
+
+    backend = _backend_with(_FakeSdk(raises=ConnectionError("no route")))
+    with pytest.raises(RuntimeError, match="could not reach Nebius Sandboxes"):
+        backend._preflight()

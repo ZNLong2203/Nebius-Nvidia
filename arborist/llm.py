@@ -244,12 +244,13 @@ class ScriptedLLM:
     responses: dict[str, list[dict]] = field(default_factory=dict)
     by_prompt: dict[str, dict[str, dict]] = field(default_factory=dict)
     calls: list[tuple[str, str]] = field(default_factory=list)
+    """``(tier, full user prompt)`` per call, so a test can assert what was asked."""
     usage: dict[str, Usage] = field(default_factory=lambda: {t: Usage() for t in ("nano", "super", "ultra")})
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def _respond(self, tier: str, user: str) -> dict:
         with self.lock:
-            self.calls.append((tier, user[:200]))
+            self.calls.append((tier, user))
             self.usage.setdefault(tier, Usage()).add(10, 10)
             for needle, response in (self.by_prompt.get(tier) or {}).items():
                 if needle in user:

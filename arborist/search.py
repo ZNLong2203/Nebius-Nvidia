@@ -351,10 +351,15 @@ class Arborist:
             root_cause=meta.get("root_cause", ""),
             searched=meta.get("searched", False),
             search_query=meta.get("search_query", ""),
+            attempts=meta.get("attempts", 1),
+            reply_keys=meta.get("reply_keys", []),
             hypotheses=[h.to_dict() for h in hypotheses],
         )
         if not hypotheses:
-            node.note = "no hypotheses produced"
+            node.note = (
+                f"diagnosis produced no hypotheses after {meta.get('attempts', 1)} attempt(s); "
+                f"model replied with keys {meta.get('reply_keys') or '[]'}"
+            )
             self._update(node)
             return []
 

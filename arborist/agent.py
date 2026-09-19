@@ -175,6 +175,43 @@ Produce at most {fanout} hypotheses, ordered most to least likely."""
                     max_tokens=6000,
                 )
 
+    hypotheses = _read_hypotheses(data, fanout)
+    attempts = 1
+
+    if not hypotheses:
+        # A diagnosis that yields nothing ends the expansion and, at the root,
+        # the whole run -- having already paid for the call. One retry at a
+        # higher temperature is far cheaper than the run it rescues.
+        attempts = 2
+        data = llm.json(
+            "super" if tier == "super" else tier,
+            DIAGNOSE_SYSTEM,
+            user
+            + "\n\nYour previous reply contained no usable hypotheses. Return at least one, "
+            "as a JSON object with a non-empty `hypotheses` array. Each entry needs `title` "
+            "and `strategy`.",
+            DIAGNOSE_SCHEMA,
+            temperature=0.6,
+            max_tokens=6000,
+        )
+        hypotheses = _read_hypotheses(data, fanout)
+
+    meta = {
+        "root_cause": (data.get("root_cause") or "").strip(),
+        "confidence": data.get("confidence"),
+        "request_files": [str(p) for p in (data.get("request_files") or []) if p],
+        "searched": bool(evidence),
+        "search_query": (data.get("search_query") or "").strip(),
+        "evidence": evidence[:4000],
+        "attempts": attempts,
+        # Enough to tell "the model answered something unexpected" from "the
+        # model answered nothing at all", without storing its prose.
+        "reply_keys": sorted(data) if isinstance(data, dict) else [],
+    }
+    return hypotheses, meta
+
+
+def _read_hypotheses(data: dict, fanout: int) -> list[Hypothesis]:
     hypotheses: list[Hypothesis] = []
     for raw in (data.get("hypotheses") or [])[:fanout]:
         if not isinstance(raw, dict):
@@ -192,16 +229,7 @@ Produce at most {fanout} hypotheses, ordered most to least likely."""
                 strategy=strategy,
             )
         )
-
-    meta = {
-        "root_cause": (data.get("root_cause") or "").strip(),
-        "confidence": data.get("confidence"),
-        "request_files": [str(p) for p in (data.get("request_files") or []) if p],
-        "searched": bool(evidence),
-        "search_query": (data.get("search_query") or "").strip(),
-        "evidence": evidence[:4000],
-    }
-    return hypotheses, meta
+    return hypotheses
 
 
 def propose_patch(
@@ -250,16 +278,12 @@ Write the minimal patch that implements this hypothesis."""
         new_content = raw.get("new_content")
         search = raw.get("search")
         replace = raw.get("replace")
+        # A `search` with no `replace` is ambiguous: it could be a deletion, or a
+        # reply that was cut off. Dropping it costs one branch; acting on it
+        # could delete working code.
         if new_content is None and (search is None or replace is None):
             continue
-        edits.append(
-            Edit(
-                path=path,
-                search=search,
-                replace=replace if replace is not None else ("" if search is not None else None),
-                new_content=new_content,
-            )
-        )
+        edits.append(Edit(path=path, search=search, replace=replace, new_content=new_content))
     return edits, (data.get("explanation") or "").strip()
 
 

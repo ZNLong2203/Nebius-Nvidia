@@ -60,6 +60,7 @@ through the spend strip.
 | `app/page.tsx` | Assembles the four regions: command bar, tree, inspector, spend |
 | `lib/useRun.ts` | Boot, the SSE subscription, and the event reducer |
 | `lib/tree.ts` | Tidy-tree layout, ancestry, status vocabulary |
+| `lib/viewport.ts` | Pan, zoom, auto-fit, and the drag-versus-click threshold |
 | `lib/api.ts` | The five endpoints and the event stream |
 | `components/SearchTree.tsx` | The tree: SVG, enter animations, hover ancestry |
 | `components/Inspector.tsx` | One node in full — patch, tests fixed, tests broken |
@@ -67,6 +68,33 @@ through the spend strip.
 | `lib/highlight.ts` | The highlighter: ~150 lines, no dependency |
 | `components/SpendStrip.tsx` | Tokens per tier, branches, sandbox runs, time saved |
 | `components/ActivityFeed.tsx` | What the agent is doing, with the tier that did it |
+
+## Moving around the tree
+
+A scroll container was fine while trees were four nodes wide. A search that goes
+deep stops fitting, and the shape is the point — so the canvas is a real
+viewport:
+
+| Gesture | Does |
+|---|---|
+| drag | pan |
+| scroll / two-finger | pan |
+| ⌘ or ctrl + scroll, trackpad pinch | zoom at the pointer |
+| arrow keys (shift for bigger steps) | pan |
+| `+` / `-` | zoom |
+| `0`, or the ⤢ button | fit everything on screen |
+
+It **auto-fits until the first deliberate interaction**, so a run that grows
+while you watch stays entirely visible without anyone touching it — and stops
+the moment someone takes control. The fit button hands control back.
+
+Below 45% zoom the cards drop their text and become their shape: status colour
+and how much of the suite passes. Zoomed out you are reading the search, not the
+patches, and unreadable 5px type is noise. Strokes use `non-scaling-stroke`, so
+borders and edges stay crisp at any scale.
+
+A drag that travels more than four pixels suppresses the click, so panning
+across a card never selects it by accident.
 
 ## Reading a patch
 

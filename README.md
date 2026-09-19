@@ -198,6 +198,18 @@ Worth stating plainly:
 - **Sandboxes is in Beta.** Occasional execution failures are handled as node-level outcomes, not crashes, but they do cost a branch.
 - **No PR opening yet.** The run report and diff are written to `runs/`; wiring them to a GitHub App is the obvious next step and is not built.
 
+## Documentation
+
+| Page | Read it for |
+|---|---|
+| [docs/architecture.md](docs/architecture.md) | The pieces, what each owns, how they fit |
+| [docs/search-algorithm.md](docs/search-algorithm.md) | Selection, scoring, pruning, termination — with a worked example |
+| [docs/run-flow.md](docs/run-flow.md) | One run end to end, and every event it emits |
+| [docs/models.md](docs/models.md) | Nemotron tiering, the three prompts, budget accounting |
+| [docs/sandboxes.md](docs/sandboxes.md) | The Nebius Sandboxes integration and the backend contract |
+| [docs/api.md](docs/api.md) | HTTP endpoints and the SSE event stream |
+| [docs/development.md](docs/development.md) | Setup, tests, adding a backend or an eval case |
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -10,3 +10,7 @@ dist/
 build/
 runs/
 .DS_Store
+
+# Private working notes — submission material, scripts, strategy. Never committed.
+.private/
+private/

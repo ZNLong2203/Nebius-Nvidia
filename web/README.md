@@ -61,6 +61,8 @@ through the spend strip.
 | `lib/useRun.ts` | Boot, the SSE subscription, and the event reducer |
 | `lib/tree.ts` | Tidy-tree layout, ancestry, status vocabulary |
 | `lib/viewport.ts` | Pan, zoom, auto-fit, and the drag-versus-click threshold |
+| `lib/replay.ts` | Reconstructing the order branches were created in |
+| `components/ReplayBar.tsx` | Transport, per-branch scrub track, speed |
 | `lib/api.ts` | The five endpoints and the event stream |
 | `components/SearchTree.tsx` | The tree: SVG, enter animations, hover ancestry |
 | `components/Inspector.tsx` | One node in full — patch, tests fixed, tests broken |
@@ -95,6 +97,21 @@ borders and edges stay crisp at any scale.
 
 A drag that travels more than four pixels suppresses the click, so panning
 across a card never selects it by accident.
+
+## Replaying a finished run
+
+A recorded run arrives as a finished tree, which shows the answer but not the
+search. The replay bar reconstructs the order the branches were created in and
+plays them back, so the thing this project is actually about is visible without
+waiting several minutes for a live run — which is what a demo video needs.
+
+The order is breadth-first by depth, because that is the order the search
+expands in: every sibling of a level is evaluated before the winner of that
+level is forked. The track is not a progress bar — each tick is one branch,
+coloured by how it turned out, so a row of blue with two red in it already tells
+you what happened before you press anything.
+
+It only appears for a finished run. A live one is already happening.
 
 ## Reading a patch
 

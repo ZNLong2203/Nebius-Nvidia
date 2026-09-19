@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useReplay } from "@/lib/replay";
+import { ReplayBar } from "@/components/ReplayBar";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { CommandBar } from "@/components/CommandBar";
 import { ContextStrip } from "@/components/ContextStrip";
@@ -28,12 +30,17 @@ export default function Page() {
     window.history.replaceState(null, "", url);
   }, []);
 
+  // Replay only applies to a finished run; a live one is already happening.
+  const replayable = !state.running && state.nodes.length > 1;
+  const replay = useReplay(state.nodes, replayable);
+  const shownNodes = replayable ? replay.nodes : state.nodes;
+
   const selected = useMemo(
-    () => state.nodes.find((node) => node.id === selectedId) ?? null,
-    [state.nodes, selectedId],
+    () => shownNodes.find((node) => node.id === selectedId) ?? null,
+    [shownNodes, selectedId],
   );
 
-  const hasTree = state.nodes.length > 0;
+  const hasTree = shownNodes.length > 0;
   const showActivity = state.activity.length > 0 || state.running;
 
   return (
@@ -68,7 +75,7 @@ export default function Page() {
         >
           {hasTree ? (
             <SearchTree
-              nodes={state.nodes}
+              nodes={shownNodes}
               winnerId={state.result?.winner_id ?? null}
               selectedId={selectedId}
               running={state.running}
@@ -92,6 +99,22 @@ export default function Page() {
           )}
         </aside>
       </main>
+
+      {replayable && (
+        <ReplayBar
+          ordered={replay.ordered}
+          cursor={replay.cursor}
+          total={replay.total}
+          playing={replay.playing}
+          speed={replay.speed}
+          revealed={replay.revealed}
+          onPlay={replay.play}
+          onPause={replay.pause}
+          onSeek={replay.seek}
+          onStep={replay.step}
+          onSpeed={replay.setSpeed}
+        />
+      )}
 
       <SpendStrip result={state.result} />
     </div>

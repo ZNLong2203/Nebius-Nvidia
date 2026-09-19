@@ -32,7 +32,7 @@ export function Inspector({
             <Badge tone={meta.tone} icon={meta.icon}>
               {meta.label}
             </Badge>
-            <h2 className="mt-2 text-[15.5px] leading-snug font-semibold tracking-[-0.01em]">
+            <h2 className="mt-2 max-w-[52ch] text-[16.5px] leading-snug font-semibold tracking-[-0.015em]">
               {title}
             </h2>
           </div>
@@ -117,7 +117,7 @@ export function Inspector({
 
         {node.regressions.length > 0 && (
           <Collapsible title="Tests it broke" count={node.regressions.length}>
-            <p className="mb-2 text-[12px] leading-relaxed text-ink-2">
+            <p className="mb-2 max-w-[68ch] text-[12.5px] leading-relaxed text-ink-2">
               These passed at the parent state. That is what made this branch a dead end — and
               because nothing was mutated, abandoning it cost nothing.
             </p>
@@ -133,19 +133,19 @@ export function Inspector({
 
         {node.diagnosis && (
           <Collapsible title="The diagnosis">
-            <p className="text-[12.5px] leading-relaxed text-ink-2">{node.diagnosis}</p>
+            <p className="max-w-[68ch] text-[13px] leading-relaxed text-ink-2">{node.diagnosis}</p>
           </Collapsible>
         )}
 
         {node.hypothesis?.rationale && (
           <Collapsible title="Why this theory">
-            <p className="text-[12.5px] leading-relaxed text-ink-2">{node.hypothesis.rationale}</p>
+            <p className="max-w-[68ch] text-[13px] leading-relaxed text-ink-2">{node.hypothesis.rationale}</p>
           </Collapsible>
         )}
 
         {node.explanation && (
           <Collapsible title="What the patch does">
-            <p className="text-[12.5px] leading-relaxed text-ink-2">{node.explanation}</p>
+            <p className="max-w-[68ch] text-[13px] leading-relaxed text-ink-2">{node.explanation}</p>
           </Collapsible>
         )}
 
@@ -229,7 +229,7 @@ function Explainer({ result }: { result: RunResult | null }) {
   return (
     <div className="scroll-thin h-full overflow-y-auto px-5 py-5">
       <h2 className="text-[15.5px] font-semibold tracking-[-0.01em]">How to read this</h2>
-      <p className="mt-2 text-[12.5px] leading-relaxed text-ink-2">
+      <p className="mt-2 max-w-[68ch] text-[13px] leading-relaxed text-ink-2">
         Every card is an <strong className="text-ink">immutable repository state</strong>. Moving
         right means a patch was applied <em>on top of</em> the one before it. Cards stacked
         vertically are rival theories of the same failure, each tested from the identical
@@ -244,7 +244,7 @@ function Explainer({ result }: { result: RunResult | null }) {
           ["var(--critical)", "Broke a test that used to pass. Abandoned at no cost."],
           ["var(--ink-3)", "The patch would not apply. It never reached the sandbox."],
         ].map(([colour, text]) => (
-          <li key={text} className="flex gap-2.5 text-[12.5px] text-ink-2">
+          <li key={text} className="flex max-w-[68ch] gap-2.5 text-[13px] text-ink-2">
             <span
               aria-hidden
               className="mt-[7px] h-[3px] w-4 shrink-0 rounded-full"
@@ -255,7 +255,7 @@ function Explainer({ result }: { result: RunResult | null }) {
         ))}
       </ul>
 
-      <p className="mt-4 rounded-lg bg-surface-2 px-3 py-2 text-[12px] leading-relaxed text-ink-2">
+      <p className="mt-4 max-w-[68ch] rounded-lg bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-ink-2">
         Hover a card to light up everything it was built on. Select one for its patch, the tests it
         fixed, and the tests it broke.
       </p>

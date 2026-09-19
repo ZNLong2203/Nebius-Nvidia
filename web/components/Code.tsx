@@ -81,7 +81,7 @@ export function DiffBlock({
           </div>
         </figcaption>
       )}
-      <div className="scroll-thin max-h-[340px] overflow-auto">
+      <div className="scroll-thin max-h-[420px] overflow-auto">
         <pre className="mono m-0 p-0 text-[11.5px] leading-[1.55]">
           {rows.map((row, index) => (
             <div
@@ -116,7 +116,7 @@ export function DiffBlock({
 export function CodeBlock({
   source,
   path,
-  max = 340,
+  max = 420,
 }: {
   source: string;
   path?: string;

@@ -43,6 +43,16 @@ always an icon *and* a word as well as a colour.
 goes: Nano wide and cheap, Super focused, Ultra usually empty. That is the
 architecture's whole claim, visible without reading a table.
 
+## Layout
+
+The panel takes a third of the width above `lg`, because it holds code and 400px
+of it wraps badly. Prose inside is capped at 68 characters separately, so a wide
+screen buys the diff room without turning paragraphs into a single long line.
+
+Below `lg` the two stack. Both halves are `min-h-0` inside an `overflow-hidden`
+parent — without that the panel grows to its content height and pushes straight
+through the spend strip.
+
 ## Structure
 
 | Path | What it does |

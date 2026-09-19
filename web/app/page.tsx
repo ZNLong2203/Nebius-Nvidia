@@ -56,9 +56,12 @@ export default function Page() {
         error={state.error}
       />
 
-      <main className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      {/* Stacked below lg, side by side above it. `overflow-hidden` plus
+          `min-h-0` on both children is what stops the panel growing to its
+          content height and pushing through the strip below. */}
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <section
-          className="relative min-h-[320px] min-w-0 flex-1 lg:min-h-0"
+          className="relative min-h-[260px] min-w-0 flex-1 basis-1/2 lg:basis-auto"
           aria-label="Search tree"
         >
           {hasTree ? (
@@ -74,7 +77,9 @@ export default function Page() {
           )}
         </section>
 
-        <aside className="flex w-full shrink-0 flex-col border-t border-edge bg-surface lg:w-[400px] lg:border-t-0 lg:border-l xl:w-[440px]">
+        {/* A third of the width. Code needs the room; the prose inside is
+            capped separately so lines stay readable when the screen is wide. */}
+        <aside className="flex min-h-0 w-full flex-1 basis-1/2 flex-col overflow-hidden border-t border-edge bg-surface lg:w-1/3 lg:min-w-[400px] lg:flex-none lg:basis-auto lg:border-t-0 lg:border-l">
           <div className="min-h-0 flex-1">
             <Inspector node={selected} result={state.result} onClose={() => select(null)} />
           </div>

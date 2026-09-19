@@ -177,3 +177,14 @@ def test_health_reports_whether_a_live_run_is_possible(client, runs_dir, monkeyp
     body = client.get("/api/health").json()
     assert body["can_run"] is False
     assert body["saved_runs"] == 1
+
+
+def test_demo_finds_an_explicit_report_by_name_when_the_path_moved(
+    client, runs_dir, monkeypatch, multi_branch_report
+):
+    """A relative ARBORIST_DEMO_RUN written for the working tree must still
+    resolve when the reports are on a mounted volume."""
+    monkeypatch.setenv("ARBORIST_DEMO_RUN", f"runs/{multi_branch_report['run_id']}.json")
+    body = client.get("/api/demo").json()
+    assert body["available"] is True
+    assert body["run"]["run_id"] == multi_branch_report["run_id"]

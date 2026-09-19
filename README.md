@@ -122,6 +122,12 @@ You get a live tree in the terminal, then the winning diff, the token spend per 
 ### Watch it search
 
 ```bash
+docker compose up --build     # http://localhost:8000 — builds the UI too
+```
+
+Or without Docker:
+
+```bash
 cd web && npm install && npm run build && cd ..   # optional: the full interface
 arborist serve                                     # http://127.0.0.1:8000
 ```
@@ -228,7 +234,6 @@ Worth stating plainly:
 - **The suite is the oracle.** A bug with no failing test is invisible, and a weak suite can be satisfied by a bad patch — which is why Ultra is asked to flag suite-gaming rather than trusting the score outright.
 - **Sandboxes is in Beta, and access is granted per project.** A key that works for inference can have every Sandboxes permission denied; the backend preflights for this and says so rather than failing mid-run. Execution failures once access is granted are handled as node-level outcomes, not crashes, but they do cost a branch.
 - **Pull requests are opened from the CLI, not automatically.** `arborist pr` branches, commits, pushes and calls `gh`. There is no GitHub App and nothing watches CI for you — a failing build does not yet wake the agent up.
-- **The Dockerfile has not been built in CI.** It is straightforward and the service is stateless, but treat it as untested until it runs somewhere.
 
 ## Documentation
 

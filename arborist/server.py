@@ -226,7 +226,11 @@ def demo_run() -> dict:
     """
     settings = load_settings()
     if settings.demo_run:
-        candidates = [Path(settings.demo_run)]
+        # A relative path is written against the working tree, but in a
+        # container the reports live on a mounted volume. Fall back to the same
+        # file inside runs_dir rather than silently showing nothing.
+        chosen = Path(settings.demo_run)
+        candidates = [chosen, _runs_dir() / chosen.name]
     else:
         # Newest-first is the wrong default on its own: the last thing written
         # is often a one-node experiment. Prefer a run that actually finished

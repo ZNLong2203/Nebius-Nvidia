@@ -138,3 +138,17 @@ def test_preflight_reports_an_unreachable_service(monkeypatch):
     backend = _backend_with(_FakeSdk(raises=ConnectionError("no route")))
     with pytest.raises(RuntimeError, match="could not reach Nebius Sandboxes"):
         backend._preflight()
+
+
+def test_local_backend_resolves_python_to_this_interpreter():
+    """`python -m pytest` in a test command must mean the environment Arborist runs in."""
+    import sys
+
+    backend = LocalBackend()
+    try:
+        cp = backend.base({}, "ignored")
+        result = backend.run(cp, "python -c 'import sys; print(sys.executable)'")
+        assert result.ok, result.stderr
+        assert result.stdout.strip() == sys.executable
+    finally:
+        backend.close()

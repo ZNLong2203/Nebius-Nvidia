@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import uuid
@@ -280,6 +281,13 @@ class LocalBackend:
 
         env = dict(os.environ)
         env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
+        # Put the interpreter running Arborist first on PATH, so `python` and
+        # `pytest` in a test command mean this environment. Under the contree
+        # backend they mean the image's own python; locally, without this, they
+        # would mean whatever the machine happens to have -- which on a Mac is a
+        # system python with no pytest.
+        interpreter_bin = str(Path(sys.executable).parent)
+        env["PATH"] = interpreter_bin + os.pathsep + env.get("PATH", "")
         try:
             proc = subprocess.run(
                 command,

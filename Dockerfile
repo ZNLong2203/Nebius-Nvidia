@@ -21,8 +21,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-COPY pyproject.toml README.md ./
+# LICENSE is required at build time: pyproject declares `license = {file = ...}`
+# and hatchling reads it while generating metadata.
+COPY pyproject.toml README.md LICENSE ./
 COPY arborist ./arborist
+# Editable on purpose. The service locates `ui/` and `web/out/` relative to the
+# package, so a site-packages install would look for them in the wrong place.
 RUN pip install --no-cache-dir -e ".[contree]"
 
 COPY ui ./ui

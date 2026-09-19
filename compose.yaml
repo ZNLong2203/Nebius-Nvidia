@@ -1,0 +1,18 @@
+services:
+  arborist:
+    build: .
+    image: arborist:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # The image keeps run reports on a volume, so these two have to point
+      # there rather than at the working tree they were written for.
+      ARBORIST_RUNS_DIR: /data/runs
+      ARBORIST_DEMO_RUN: ""
+    volumes:
+      # Reports written inside the container land in ./runs, and the recorded
+      # run already there is what the page opens on.
+      - ./runs:/data/runs
+    restart: unless-stopped

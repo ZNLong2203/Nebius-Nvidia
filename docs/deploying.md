@@ -41,13 +41,28 @@ The image builds the Next.js interface in a node stage and copies the static
 export into the Python image, so nothing but uvicorn runs at runtime.
 
 ```bash
+docker compose up --build        # http://localhost:8000
+```
+
+That reads `.env`, mounts `./runs` so recorded runs survive a rebuild, and
+overrides the two path settings that were written for the working tree
+(`ARBORIST_RUNS_DIR`, `ARBORIST_DEMO_RUN`) to point at the volume instead.
+
+Without compose:
+
+```bash
 docker build -t arborist .
 docker run --rm -p 8000:8000 \
-  -e NEBIUS_API_KEY=… \
-  -e TAVILY_API_KEY=… \
+  --env-file .env \
+  -e ARBORIST_RUNS_DIR=/data/runs -e ARBORIST_DEMO_RUN= \
   -v "$PWD/runs:/data/runs" \
   arborist
 ```
+
+Inside the container `ARBORIST_BACKEND=local` executes in the container itself,
+which is a reasonable place for it: the image is `python:3.12-slim`, and the
+setup command installs whatever the target repository needs. Switch to
+`contree` once Sandboxes access is granted.
 
 Without `NEBIUS_API_KEY` the service still starts and still replays recorded
 runs; the Run button is disabled and says why. That is the right behaviour for a

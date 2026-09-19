@@ -46,6 +46,12 @@ CASES = {
         "setup": "pip install -q pytest",
         "bugs": 2,
     },
+    "outside-knowledge": {
+        "path": ROOT / "evals" / "cases" / "outside-knowledge",
+        "test": "python -m pytest -q",
+        "setup": "pip install -q -r requirements.txt",
+        "bugs": 2,
+    },
 }
 
 

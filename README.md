@@ -154,12 +154,15 @@ python evals/run_eval.py --cases all
 
 Runs every case twice under an identical budget, branching on and off, and writes `evals/results.md` with: solved yes/no, tests passing before and after, patches evaluated, sandbox executions, **how many times setup had to run**, invalid patches, wall time, and tokens per tier.
 
-Two cases ship:
+Three cases ship, each testing a different property:
 
-- **`broken-invoice`** — three independent bugs. Tests whether the search can *deepen*: keep a partial repair and build the next fix on top of it.
-- **`regression-trap`** — a TTL cache where the obvious fix for test A silently breaks test B. Tests whether the search notices a *trade* and refuses to follow it.
+| Case | The situation | What it measures |
+|---|---|---|
+| **`broken-invoice`** | Three independent bugs in three files | **Depth** — can it keep a partial repair and build the next fix on top of it? |
+| **`regression-trap`** | A TTL cache where the obvious fix for test A silently breaks test B | **Backtracking** — does it notice a *trade* and refuse to follow it? |
+| **`outside-knowledge`** | A Pydantic 1.x model in a project pinned to 2.x | **Looking things up** — the answer is in no file here, and the lazy fix that silences the error still fails |
 
-The second case is the one that matters. Scoring on pass-rate alone calls "fixed two, broke one" progress. Arborist scores against the parent's **test identities**, so a trade shows up as a regression, the branch is marked and abandoned, and the search returns to the sibling. See `Arborist.score` in [`arborist/search.py`](arborist/search.py).
+`regression-trap` is the one that matters most. Scoring on pass-rate alone calls "fixed two, broke one" progress. Arborist scores against the parent's **test identities**, so a trade shows up as a regression, the branch is marked and abandoned, and the search returns to the sibling. See `Arborist.score` in [`arborist/search.py`](arborist/search.py).
 
 > Results in `evals/results.md` are whatever your own run produces. Numbers are not checked in, because a benchmark table you cannot reproduce is worth nothing.
 

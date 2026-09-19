@@ -119,9 +119,19 @@ the immutability invariant, and register it in `build_backend`. Then run
    path, test command, setup command, and the number of distinct bugs.
 3. `python evals/run_eval.py --cases <name>`
 
-A good case has bugs that are **independent** (so depth is required) or
-**interacting** (so backtracking is required). `broken-invoice` is the first kind;
-`regression-trap` is the second, and is the more interesting test of the design.
+A good case isolates one property of the search:
+
+| Property | How to build a case for it |
+|---|---|
+| **Depth** | Independent bugs in separate files, so a partial repair has to be kept and built on. `broken-invoice`. |
+| **Backtracking** | Two failing tests whose obvious fixes fight each other, so the naive second fix undoes the first. `regression-trap`. |
+| **External knowledge** | A failure whose cause is inside a dependency, with nothing in the repository that explains it. `outside-knowledge`. |
+
+The trap to avoid is a case the model can solve from its priors without reading
+anything. `outside-knowledge` guards against this by making the *obvious* fix —
+the one the error message suggests — insufficient: it silences the exception but
+leaves deprecated API in place, and the project treats deprecation warnings as
+failures.
 
 ## Supporting another language
 

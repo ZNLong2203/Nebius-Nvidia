@@ -1,7 +1,6 @@
 from datetime import date
 
 import pytest
-
 from billing import InvoiceLine, invoice_total, line_total, prorate
 from billing.money import round_money
 from billing.proration import billed_days

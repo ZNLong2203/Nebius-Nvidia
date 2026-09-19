@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from arborist import server
 from arborist.llm import ScriptedLLM
 
-from .test_search import _scripted_repair_sequence  # noqa: PLC2701 - shared fixture data
+from .test_search import _scripted_repair_sequence
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "broken-invoice"
 PYTEST_CMD = f"{shlex.quote(sys.executable)} -m pytest -q"

@@ -79,7 +79,9 @@ def fix(
                 console.print(f"  [cyan]-[/] {h['title'][:110]}")
         elif kind == "node":
             node = event["node"]
-            if node["depth"] == 0 or node["status"] == "running":
+            # Nodes are re-emitted when they become the next fork point, which
+            # the UI needs and the terminal does not.
+            if node["depth"] == 0 or node["status"] == "running" or node["expanded"]:
                 return
             style = STATUS_STYLE.get(node["status"], "white")
             report = node.get("report") or {}

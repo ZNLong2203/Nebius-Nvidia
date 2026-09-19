@@ -259,7 +259,7 @@ def test_a_regressing_branch_is_recorded_and_not_followed(backend):
     agent = Arborist(settings, backend, llm)
     result = agent.run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
 
-    child = [n for n in result.nodes if n.depth == 1][0]
+    child = next(n for n in result.nodes if n.depth == 1)
     assert child.status == "regressed"
     assert child.regressions, "the tests it broke are named, not just counted"
     assert not result.solved

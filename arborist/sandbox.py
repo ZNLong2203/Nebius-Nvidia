@@ -26,7 +26,7 @@ import subprocess
 import tempfile
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -217,7 +217,7 @@ class LocalBackend:
         self._states[sid] = _LocalState(path=path)
         return Checkpoint(id=sid, handle=path)
 
-    def base(self, files: dict[str, bytes], image: str) -> Checkpoint:  # noqa: ARG002
+    def base(self, files: dict[str, bytes], image: str) -> Checkpoint:
         cp = self._new_state(None)
         _write_files(Path(cp.handle), files)
         cp.label = "base"
@@ -239,7 +239,7 @@ class LocalBackend:
         env = dict(os.environ)
         env.setdefault("PYTHONDONTWRITEBYTECODE", "1")
         try:
-            proc = subprocess.run(  # noqa: S602 - the command is ours, not user input
+            proc = subprocess.run(
                 command,
                 shell=True,
                 cwd=child.handle,

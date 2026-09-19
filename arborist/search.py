@@ -25,10 +25,11 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .agent import adjudicate, diagnose, propose_patch
 from .config import Settings
@@ -142,7 +143,7 @@ class Arborist:
     def _emit(self, kind: str, **payload) -> None:
         try:
             self._on_event({"type": kind, "at": time.time(), **payload})
-        except Exception:  # noqa: BLE001 - a broken listener must not kill a run
+        except Exception:  # noqa: BLE001, S110 - a broken listener must not kill a run
             pass
 
     def _register(self, node: Node, state: _NodeState) -> None:
@@ -215,7 +216,6 @@ class Arborist:
 
         raw_files = load_repo(cfg.repo_path)
         sources = text_files(raw_files)
-        file_index = sorted(sources)
 
         base_cp = self.backend.base(raw_files, cfg.image)
         self._emit("checkpoint", stage="base", checkpoint=base_cp.id)
@@ -439,7 +439,7 @@ class Arborist:
             fork_from = linear_base
             prefix = cfg.setup_command or ""
 
-        checkpoint, report, stdout, stderr, seconds = self._run_tests(
+        checkpoint, report, stdout, stderr, _elapsed = self._run_tests(
             fork_from, cfg, files=payload, prefix=prefix
         )
 

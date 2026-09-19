@@ -7,12 +7,12 @@ from .search import Arborist, RunConfig, RunResult
 __version__ = "0.1.0"
 __all__ = [
     "Arborist",
+    "Edit",
+    "Hypothesis",
+    "Node",
     "RunConfig",
     "RunResult",
     "Settings",
-    "load_settings",
-    "Node",
-    "Edit",
-    "Hypothesis",
     "TestReport",
+    "load_settings",
 ]

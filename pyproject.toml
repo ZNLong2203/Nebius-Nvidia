@@ -37,3 +37,8 @@ filterwarnings = ["ignore::DeprecationWarning"]
 [tool.ruff]
 line-length = 110
 target-version = "py311"
+
+[tool.ruff.lint]
+# B008 is how Typer declares options; PLW1510 is deliberate -- a non-zero exit
+# from the test command is the signal we are looking for, not an error.
+ignore = ["B008", "PLW1510"]

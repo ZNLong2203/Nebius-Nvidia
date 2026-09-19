@@ -196,9 +196,9 @@ def unified_diff(before: dict[str, str], after: dict[str, str]) -> str:
 # --------------------------------------------------------------------------- #
 
 _SUMMARY = re.compile(
-    r"(?:^|\s)(\d+)\s+(passed|failed|error|errors|skipped|xfailed|xpassed)\b", re.I
+    r"(?:^|\s)(\d+)\s+(passed|failed|error|errors|skipped|xfailed|xpassed)\b", re.IGNORECASE
 )
-_FAILED_LINE = re.compile(r"^(?:FAILED|ERROR)\s+(\S+)", re.M)
+_FAILED_LINE = re.compile(r"^(?:FAILED|ERROR)\s+(\S+)", re.MULTILINE)
 
 
 def parse_junit(xml_bytes: bytes) -> TestReport | None:

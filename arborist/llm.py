@@ -167,7 +167,7 @@ def parse_json(raw: str) -> dict:
     if not raw:
         return {}
     text = raw.strip()
-    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
     if fence:
         text = fence.group(1).strip()
     try:
@@ -220,11 +220,11 @@ class ScriptedLLM:
         self.usage.setdefault(tier, Usage()).add(10, 10)
         return queue.pop(0) if queue else {}
 
-    def json(self, tier: str, system: str, user: str, schema: dict | None = None, **kw) -> dict:  # noqa: ARG002
+    def json(self, tier: str, system: str, user: str, schema: dict | None = None, **kw) -> dict:
         self.calls.append((tier, user[:200]))
         return self._next(tier)
 
-    def text(self, tier: str, system: str, user: str, **kw) -> str:  # noqa: ARG002
+    def text(self, tier: str, system: str, user: str, **kw) -> str:
         self.calls.append((tier, user[:200]))
         return json.dumps(self._next(tier))
 

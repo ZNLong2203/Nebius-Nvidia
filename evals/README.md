@@ -11,12 +11,11 @@ invalid patches, wall time, and tokens per tier.
 
 ## What these cases do and do not measure
 
-As of the last run, **none of the three discriminates**: Nemotron 3 solves each
-of them in one or two patches, and a case that one patch solves cannot measure a
-search. The table they produce is still worth having — it caught a patch-
-application bug that was losing three of five branches — but it is not evidence
-that branching beats a linear baseline, and this file will not pretend otherwise
-until a case exists that can show it.
+Of the four, **only `masked-faults` discriminates**. The other three are each solved by Nemotron 3 in one or two
+patches, and a case that one patch solves cannot measure a search. They are
+still worth running — they caught a patch-application bug that was losing three
+of five branches — but the claim that branching beats a linear baseline rests on
+`masked-faults` alone, and on two runs per arm.
 
 ## What "the same budget" means
 
@@ -100,8 +99,19 @@ Reading the source cannot separate them: which fix moves the numbers depends on
 where the rows fall in the data. Only running does.
 
 **What it measures: whether a search is worth anything.** The other three cases
-are solved by one or two patches, so they cannot. Whether this one discriminates
-is itself an open question — see the results table.
+are solved by one or two patches, so they cannot. This one does.
+
+| | solved | patches (median) | wall (median) | setup runs |
+|---|---|---|---|---|
+| branching | **2/2** | 6 | 191s | 1 |
+| linear baseline | **0/2** | 12 — budget exhausted | 582s | 13 |
+
+The branching run put three rival repairs on one checkpoint: the fix the failing
+test is named after came back **neutral**, its sibling reached 3/4, and the next
+fork closed it out. The linear run tried twelve patches across three different
+first repairs, and every second-level attempt regressed the suite back to a
+collection error — it had no sibling from the same state to compare against, so
+it could not tell a wrong theory from a wrong implementation of a right one.
 
 ### `outside-knowledge` — knowing when to look it up
 

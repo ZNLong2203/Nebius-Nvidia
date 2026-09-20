@@ -193,23 +193,44 @@ taught the search nothing. Naming short files as whole-file rewrites and giving
 a failed patch one repair attempt with the reason fed back took the invalid rate
 from 3-of-5 to 0-of-8, and turned two unsolved runs into solved ones.
 
-**Branching is not yet shown to beat a linear baseline.** On `broken-invoice`
-after that fix, the linear baseline reached 9/9 with a single patch in 157s and
-27.6k tokens; the branching search reached 9/9 at depth 3 in 333s and 86.8k
-tokens. Same answer, a third of the cost, no branching.
+**Branching wins only when the case needs a search — and most cases do not.**
 
-The reason is a flaw in the cases, not a verdict on the method: **all three are
-solvable by one patch**, and a case one patch solves cannot measure a search at
-all. Building a case that genuinely requires search — where the second fault is
-invisible until the first is repaired — is the open work, and until it exists
-this repository does not claim branching wins.
+On `broken-invoice`, `regression-trap` and `outside-knowledge` the linear
+baseline matches or beats the search, because Nemotron repairs each of them in
+one or two patches. A case one patch solves cannot measure a search, and for a
+long time this repository had nothing else.
 
-What the design does buy, and what the eval does show, is narrower and still
-worth having: forking a warm checkpoint makes evaluating several rival patches
-from an identical state cheap enough to be ordinary, and scoring against the
-parent's *test identities* makes a trade — fixed two, broke one — visible as the
-regression it is rather than as progress. See `Arborist.score` in
-[`arborist/search.py`](arborist/search.py).
+`masked-faults` was built so that cannot happen. An import error stops the suite
+collecting, so two further faults produce no observable signal until it is
+repaired; then the obvious fix — the one the failing test is literally named
+after — moves nothing, because a second fault is still hiding the rows that
+would have proved it.
+
+| `masked-faults` | solved | patches (median) | wall (median) | tokens (median) | setup runs |
+|---|---|---|---|---|---|
+| **branching** | **2/2** | 6 | 191s | 55.9k | 1 |
+| linear baseline | **0/2** | 12 (budget exhausted) | 582s | 159.8k | 13 |
+
+The trees say why. The branching run put three rival repairs on the same
+checkpoint; the one the test name points at came back **neutral — no test
+changed state** — while its sibling reached 3/4 and the next fork closed it out.
+The linear run tried twelve patches across three different first repairs and
+every second-level attempt regressed the suite back to a collection error. It
+had no sibling evaluated from the same state to compare against, so it could not
+tell a wrong theory from a wrong implementation of a right one.
+
+This is the comparison **after** removing three biases that had favoured
+branching: a depth cap that limited the linear arm to four patches, a frontier
+rule that stopped it with most of its budget unspent, and setup costs computed
+from a formula rather than counted. Two runs per arm is a small sample, and one
+case is one case — but the linear arm exhausting its full budget twice without
+passing a second test is not a coin flip.
+
+Two further things the eval shows, both narrower and both worth having: scoring
+against the parent's *test identities* makes a trade — fixed two, broke one —
+visible as the regression it is rather than as progress (see `Arborist.score`),
+and forking a warm checkpoint paid the environment setup **once** against the
+baseline's thirteen times.
 
 > Results in `evals/results.md` are whatever your own run produces. Numbers are
 > not checked in, because a benchmark table you cannot reproduce is worth

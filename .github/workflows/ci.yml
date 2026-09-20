@@ -7,20 +7,24 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Everything here is pinned exactly — the runner image and all three
+    # actions. `ubuntu-latest` migrates to Ubuntu 26 on 19 Oct 2026, eleven days
+    # before this project's submission deadline, and a floating action major can
+    # move any day. Neither should be free to change under the final week.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: "22"
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10.1.0
         with:
           enable-cache: true
 

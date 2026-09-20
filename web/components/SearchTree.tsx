@@ -141,7 +141,11 @@ export function SearchTree({
                     transform={`translate(${x},${y})`}
                     role="treeitem"
                     aria-selected={selected}
-                    aria-label={`${meta.label}: ${title}, ${passing} tests passing`}
+                    aria-level={node.depth + 1}
+                    aria-label={
+                      `${meta.label}, level ${node.depth + 1}: ${title}, ${passing} tests passing` +
+                      (node.regressions.length ? `, broke ${node.regressions.length} tests` : "")
+                    }
                     tabIndex={0}
                     cursor="pointer"
                     onMouseEnter={() => setHovered(node.id)}

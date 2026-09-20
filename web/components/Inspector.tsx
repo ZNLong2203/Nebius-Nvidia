@@ -273,33 +273,56 @@ function Explainer({ result }: { result: RunResult | null }) {
   );
 }
 
-/** The final diff, split per file so each one is separately readable. */
+/**
+ * The final diff, split per file and per hunk.
+ *
+ * Merging every hunk of a file into one block loses which change happened
+ * where, and a patch that touches two distant functions then reads as one
+ * edit. Hunk headers are kept so the line numbers survive.
+ */
 function UnifiedDiff({ diff }: { diff: string }) {
-  const files: { path: string; removed: string[]; added: string[] }[] = [];
-  let current: (typeof files)[number] | null = null;
+  type Hunk = { header: string; removed: string[]; added: string[] };
+  const files: { path: string; hunks: Hunk[] }[] = [];
+  let file: (typeof files)[number] | null = null;
+  let hunk: Hunk | null = null;
 
   for (const line of diff.split("\n")) {
     if (line.startsWith("--- a/")) {
-      current = { path: line.slice(6), removed: [], added: [] };
-      files.push(current);
+      file = { path: line.slice(6), hunks: [] };
+      files.push(file);
+      hunk = null;
       continue;
     }
-    if (!current || line.startsWith("+++ ") || line.startsWith("@@")) continue;
-    if (line.startsWith("-")) current.removed.push(line.slice(1));
-    else if (line.startsWith("+")) current.added.push(line.slice(1));
+    if (!file || line.startsWith("+++ ")) continue;
+    if (line.startsWith("@@")) {
+      hunk = { header: line, removed: [], added: [] };
+      file.hunks.push(hunk);
+      continue;
+    }
+    if (!hunk) continue;
+    if (line.startsWith("-")) hunk.removed.push(line.slice(1));
+    else if (line.startsWith("+")) hunk.added.push(line.slice(1));
   }
 
   if (files.length === 0) return null;
 
   return (
-    <div className="space-y-3">
-      {files.map((file) => (
-        <DiffBlock
-          key={file.path}
-          path={file.path}
-          removed={file.removed.join("\n")}
-          added={file.added.join("\n")}
-        />
+    <div className="space-y-4">
+      {files.map((f) => (
+        <div key={f.path} className="space-y-2">
+          {f.hunks.map((h, index) => (
+            <div key={index}>
+              {f.hunks.length > 1 && (
+                <div className="mono mb-1 text-[10.5px] text-ink-3">{h.header}</div>
+              )}
+              <DiffBlock
+                path={index === 0 ? f.path : undefined}
+                removed={h.removed.join("\n")}
+                added={h.added.join("\n")}
+              />
+            </div>
+          ))}
+        </div>
       ))}
     </div>
   );

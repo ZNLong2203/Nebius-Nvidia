@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import statistics
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -78,6 +79,7 @@ class Row:
     case: str
     models: str
     branching: bool
+    run: int
     solved: bool
     baseline_passing: str
     final_passing: str
@@ -101,6 +103,7 @@ def run_case(
     fanout: int,
     max_nodes: int,
     model_set: str = "nemotron",
+    repetition: int = 1,
     reports_dir: Path | None = None,
 ) -> Row:
     # Both arms get the same patch budget.
@@ -138,7 +141,7 @@ def run_case(
     # Keep the tree. A table says which mode did better; only the tree says why
     # -- and "the linear agent ran out of frontier" is not visible in a number.
     if reports_dir is not None:
-        mode = f"{model_set}-{'branching' if branching else 'linear'}"
+        mode = f"{model_set}-{'branching' if branching else 'linear'}-{repetition}"
         path = write_report(result, reports_dir)
         path.rename(path.with_name(f"{name}-{mode}.json"))
         patch = path.with_suffix(".patch")
@@ -151,6 +154,7 @@ def run_case(
         case=name,
         models=model_set,
         branching=branching,
+        run=repetition,
         solved=result.solved,
         baseline_passing=f"{base.passed}/{base.total}" if base else "-",
         final_passing=f"{final.passed}/{final.total}" if final else "-",
@@ -168,18 +172,49 @@ def run_case(
 
 def markdown(rows: list[Row]) -> str:
     head = (
-        "| case | models | branching | solved | baseline | final | patches | sandbox runs | setup runs "
+        "| case | models | branching | run | solved | baseline | final | patches | sandbox runs | setup runs "
         "| invalid | wall (s) | nano tok | super tok | ultra tok |\n"
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n"
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n"
     )
     body = "".join(
-        f"| {r.case} | {r.models} | {'on' if r.branching else 'off'} | {'yes' if r.solved else 'no'} "
+        f"| {r.case} | {r.models} | {'on' if r.branching else 'off'} | {r.run} | {'yes' if r.solved else 'no'} "
         f"| {r.baseline_passing} | {r.final_passing} | {r.patches} | {r.sandbox_runs} | {r.setup_runs} "
         f"| {r.invalid_patches} | {r.wall_seconds} | {r.tokens_nano:,} | {r.tokens_super:,} "
         f"| {r.tokens_ultra:,} |\n"
         for r in rows
     )
     return head + body
+
+
+def summarise(rows: list[Row]) -> str:
+    """Per configuration, across repetitions.
+
+    A single run of an agent is close to meaningless: the same case and settings
+    solve on one attempt and stall on the next. The median is reported rather
+    than the mean because a run that stalls skews an average and the interesting
+    figure is the typical outcome; the full spread is in the per-run table above.
+    """
+    groups: dict[tuple, list[Row]] = {}
+    for r in rows:
+        groups.setdefault((r.case, r.models, r.branching), []).append(r)
+
+    header = (
+        "| case | models | branching | solved | patches (median) | wall s (median) | "
+        "tokens (median) | wall range |"
+    )
+    out = [header, "|---|---|---|---|---|---|---|---|"]
+    for (case, models, branching), rs in groups.items():
+        solved = sum(1 for r in rs if r.solved)
+        walls = sorted(r.wall_seconds for r in rs)
+        tokens = [r.tokens_nano + r.tokens_super + r.tokens_ultra for r in rs]
+        out.append(
+            f"| {case} | {models} | {'on' if branching else 'off'} | **{solved}/{len(rs)}** "
+            f"| {statistics.median(r.patches for r in rs):.0f} "
+            f"| {statistics.median(walls):.0f} "
+            f"| {statistics.median(tokens):,.0f} "
+            f"| {walls[0]:.0f}–{walls[-1]:.0f} |"
+        )
+    return "\n".join(out) + "\n"
 
 
 def main() -> int:
@@ -189,6 +224,9 @@ def main() -> int:
     parser.add_argument("--fanout", type=int, default=4)
     parser.add_argument("--max-nodes", type=int, default=12)
     parser.add_argument("--only", choices=["both", "on", "off"], default="both")
+    parser.add_argument(
+        "--repeat", type=int, default=1, help="runs per configuration; one run proves nothing"
+    )
     parser.add_argument(
         "--model-set",
         choices=sorted(MODEL_SETS),
@@ -216,8 +254,9 @@ def main() -> int:
             print(f"unknown case: {name}", file=sys.stderr)
             return 2
         for branching in modes:
+          for repetition in range(1, args.repeat + 1):
             label = "branching on " if branching else "branching off"
-            print(f"-> {name} [{args.model_set}] [{label}]", flush=True)
+            print(f"-> {name} [{args.model_set}] [{label}] run {repetition}/{args.repeat}", flush=True)
             row = run_case(
                 name,
                 spec,
@@ -226,20 +265,24 @@ def main() -> int:
                 fanout=args.fanout,
                 max_nodes=args.max_nodes,
                 model_set=args.model_set,
+                repetition=repetition,
                 reports_dir=Path(args.reports) if args.reports else None,
             )
             rows.append(row)
             print(f"   solved={row.solved} sandbox_runs={row.sandbox_runs} wall={row.wall_seconds}s", flush=True)
 
     table = markdown(rows)
-    print("\n" + table)
+    summary = summarise(rows)
+    print("\n" + summary + "\n" + table)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
         f"# Eval results\n\nbackend: `{settings.backend}` · fanout: {args.fanout} · "
         f"node cap: {args.max_nodes} · models: `{args.model_set}` "
-        f"({', '.join(MODEL_SETS[args.model_set].values())})\n\n{table}\n",
+        f"({', '.join(MODEL_SETS[args.model_set].values())}) · "
+        f"{args.repeat} run(s) per configuration\n\n"
+        f"## Summary\n\n{summary}\n## Every run\n\n{table}\n",
         encoding="utf-8",
     )
     Path(out.with_suffix(".json")).write_text(

@@ -192,6 +192,37 @@ def markdown(rows: list[Row]) -> str:
     return head + body
 
 
+def write_results(rows: list[Row], out: Path, settings, args) -> None:
+    """Persist after every run, not at the end.
+
+    A sweep is hours long and a killed process used to lose all of it. Writing
+    as it goes also means `--resume` has something to read.
+    """
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(
+        f"# Eval results\n\nbackend: `{settings.backend}` · fanout: {args.fanout} · "
+        f"node cap: {args.max_nodes} · models: `{args.model_set}` "
+        f"({', '.join(MODEL_SETS[args.model_set].values())}) · "
+        f"{args.repeat} run(s) per configuration\n\n"
+        f"## Summary\n\n{summarise(rows)}\n## Every run\n\n{markdown(rows)}\n",
+        encoding="utf-8",
+    )
+    out.with_suffix(".json").write_text(
+        json.dumps([asdict(r) for r in rows], indent=2), encoding="utf-8"
+    )
+
+
+def load_previous(out: Path) -> list[Row]:
+    """Rows from an earlier, interrupted sweep."""
+    path = out.with_suffix(".json")
+    if not path.is_file():
+        return []
+    try:
+        return [Row(**r) for r in json.loads(path.read_text())]
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return []
+
+
 def summarise(rows: list[Row]) -> str:
     """Per configuration, across repetitions.
 
@@ -234,6 +265,11 @@ def main() -> int:
         "--repeat", type=int, default=1, help="runs per configuration; one run proves nothing"
     )
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="skip configurations already present in the results file",
+    )
+    parser.add_argument(
         "--model-set",
         choices=sorted(MODEL_SETS),
         default="nemotron",
@@ -253,7 +289,12 @@ def main() -> int:
     names = list(CASES) if args.cases == "all" else [c.strip() for c in args.cases.split(",")]
     modes = {"both": [True, False], "on": [True], "off": [False]}[args.only]
 
-    rows: list[Row] = []
+    out = Path(args.out)
+    rows: list[Row] = load_previous(out) if args.resume else []
+    done = {(r.case, r.models, r.branching, r.run) for r in rows}
+    if rows:
+        print(f"resuming: {len(rows)} run(s) already recorded", flush=True)
+
     for name in names:
         spec = CASES.get(name)
         if spec is None:
@@ -261,6 +302,8 @@ def main() -> int:
             return 2
         for branching in modes:
           for repetition in range(1, args.repeat + 1):
+            if (name, args.model_set, branching, repetition) in done:
+                continue
             label = "branching on " if branching else "branching off"
             print(f"-> {name} [{args.model_set}] [{label}] run {repetition}/{args.repeat}", flush=True)
             row = run_case(
@@ -275,25 +318,15 @@ def main() -> int:
                 reports_dir=Path(args.reports) if args.reports else None,
             )
             rows.append(row)
+            write_results(rows, out, settings, args)
             print(f"   solved={row.solved} sandbox_runs={row.sandbox_runs} wall={row.wall_seconds}s", flush=True)
 
-    table = markdown(rows)
-    summary = summarise(rows)
-    print("\n" + summary + "\n" + table)
+    if not rows:
+        print("nothing to run", file=sys.stderr)
+        return 1
 
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        f"# Eval results\n\nbackend: `{settings.backend}` · fanout: {args.fanout} · "
-        f"node cap: {args.max_nodes} · models: `{args.model_set}` "
-        f"({', '.join(MODEL_SETS[args.model_set].values())}) · "
-        f"{args.repeat} run(s) per configuration\n\n"
-        f"## Summary\n\n{summary}\n## Every run\n\n{table}\n",
-        encoding="utf-8",
-    )
-    Path(out.with_suffix(".json")).write_text(
-        json.dumps([asdict(r) for r in rows], indent=2), encoding="utf-8"
-    )
+    write_results(rows, out, settings, args)
+    print("\n" + summarise(rows) + "\n" + markdown(rows))
     print(f"written: {out}")
     return 0
 

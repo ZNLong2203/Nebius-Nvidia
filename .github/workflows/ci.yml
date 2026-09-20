@@ -27,6 +27,9 @@ jobs:
       - uses: astral-sh/setup-uv@v10.1.0
         with:
           enable-cache: true
+          # Both matrix jobs otherwise derive the same cache key from the
+          # system interpreter and race to write it.
+          cache-suffix: py${{ matrix.python-version }}
 
       # A virtual environment, not --system: the runner's interpreter is
       # externally managed (PEP 668) and refuses a system install. This is also

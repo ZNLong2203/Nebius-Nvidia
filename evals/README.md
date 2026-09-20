@@ -68,6 +68,41 @@ take the bait, so the case measures nothing about search. A case that one patch
 solves cannot, and the same is true of the other two. Replacing them with a case
 where the second fault is invisible until the first is repaired is open work.
 
+### `masked-faults` — a case one patch cannot solve
+
+Three faults in a ledger, arranged so that the later ones are **invisible from
+the starting state** and the obvious fix gives no signal.
+
+1. `parse.py` imports a name `rules.py` does not define, so the suite does not
+   collect. One error, no test results, nothing else observable.
+2. `rules.is_large` uses `>` where the documented boundary is inclusive.
+3. `report.in_period` excludes the period's final day.
+
+The data is shaped to make these interact: eleven transactions sit exactly on
+the threshold and fourteen fall on the final day of the period.
+
+| State | Result |
+|---|---|
+| as shipped | 1 collection error — faults 2 and 3 cannot be seen |
+| import fixed | 3 failed, 1 passed |
+| **+ the threshold, which is what the failing test is named after** | **3 failed, 1 passed — no change at all** |
+| + the period boundary instead | 1 failed, 3 passed |
+| all three | 4 passed |
+
+The third row is the point. The test that fails is called
+`test_large_is_inclusive_of_the_threshold`, so the obvious move is to fix the
+threshold — and that produces *no measurable improvement*, because the period
+filter is still dropping the rows that would have proved it. An agent that
+scores its work will read that as "my fix was wrong" and may revert it. The
+fault that unlocks three tests is the one nothing points at.
+
+Reading the source cannot separate them: which fix moves the numbers depends on
+where the rows fall in the data. Only running does.
+
+**What it measures: whether a search is worth anything.** The other three cases
+are solved by one or two patches, so they cannot. Whether this one discriminates
+is itself an open question — see the results table.
+
 ### `outside-knowledge` — knowing when to look it up
 
 An order model written against Pydantic 1.x, in a project whose pin has moved to

@@ -466,6 +466,41 @@ def test_a_node_is_revisited_rather_than_ending_a_run_with_budget_left(backend):
     assert result.stats["patches_evaluated"] >= 2, "the run must not stop with budget unspent"
 
 
+def test_an_expansion_that_yields_nothing_valid_does_not_end_the_run(backend):
+    """The narrower sibling of the test above, and the one that was missing.
+
+    A node whose children merely regress stays in the frontier. A node whose
+    expansion produced no child at all used to be dropped from it, so a single
+    unapplicable patch ended the search with almost all of its budget unspent
+    -- and the eval then read that as the search having nothing more to offer.
+    """
+    unapplicable = {
+        "explanation": "edits a line that is not there",
+        "edits": [{"path": "src/billing/money.py", "search": "def nope():", "replace": "pass"}],
+    }
+    good = {
+        "explanation": "the real fix",
+        "edits": [{"path": "src/billing/money.py", "new_content": MONEY_FIXED}],
+    }
+    llm = ScriptedLLM(
+        responses={
+            "super": [_diagnosis("first theory", "src/billing/money.py")] * 8,
+            "nano": [unapplicable, unapplicable, good],
+        }
+    )
+    settings = load_settings(backend="local", fanout=1, max_nodes=4, max_depth=3)
+    result = Arborist(settings, backend, llm).run(
+        RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD)
+    )
+
+    root = result.nodes[0]
+    assert root.expansions >= 2, "the root must be tried again, not dropped from the frontier"
+    assert result.stats["patches_evaluated"] >= 2, "the run must not stop after one bad patch"
+    assert any(
+        n.depth >= 1 and n.status != "invalid" for n in result.nodes
+    ), "the second expansion must reach the sandbox with a patch that applies"
+
+
 def test_setup_runs_are_counted_not_inferred(backend):
     llm = _scripted_repair_sequence()
     settings = load_settings(backend="local", fanout=1, max_nodes=8, max_depth=5)

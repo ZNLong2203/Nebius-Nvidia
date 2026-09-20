@@ -303,10 +303,6 @@ class Arborist:
                 self._update(parent_state.node)
 
                 children = self._expand(cfg, parent_state, linear_base)
-                if not children:
-                    frontier = [nid for nid in frontier if nid != candidate_id]
-                    continue
-
 
                 improved = False
                 for child_id in children:
@@ -320,7 +316,10 @@ class Arborist:
                         frontier.append(child_id)
 
                 # The node stays in the frontier: it may be worth another set
-                # of hypotheses once its first children are in.
+                # of hypotheses once its first children are in. An expansion
+                # that yielded nothing valid is the same case and the more
+                # urgent one: evicting there ended runs after a single bad
+                # patch with most of the budget unspent.
                 if parent_state.node.expansions >= MAX_EXPANSIONS_PER_NODE:
                     frontier = [nid for nid in frontier if nid != candidate_id]
                 self._stalls = 0 if improved else self._stalls + 1

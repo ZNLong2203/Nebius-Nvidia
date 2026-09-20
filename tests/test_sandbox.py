@@ -141,14 +141,19 @@ def test_preflight_reports_an_unreachable_service(monkeypatch):
 
 
 def test_local_backend_resolves_python_to_this_interpreter():
-    """`python -m pytest` in a test command must mean the environment Arborist runs in."""
+    """`python -m pytest` in a test command must mean the environment Arborist runs in.
+
+    Compared by prefix, not by path: in a uv virtualenv `python` on PATH is
+    `bin/python` while `sys.executable` is `bin/python3`, and they are the same
+    interpreter. The invariant is the environment, not the symlink name.
+    """
     import sys
 
     backend = LocalBackend()
     try:
         cp = backend.base({}, "ignored")
-        result = backend.run(cp, "python -c 'import sys; print(sys.executable)'")
+        result = backend.run(cp, "python -c 'import sys; print(sys.prefix)'")
         assert result.ok, result.stderr
-        assert result.stdout.strip() == sys.executable
+        assert result.stdout.strip() == sys.prefix
     finally:
         backend.close()

@@ -24,16 +24,27 @@ jobs:
         with:
           enable-cache: true
 
+      # A virtual environment, not --system: the runner's interpreter is
+      # externally managed (PEP 668) and refuses a system install. This is also
+      # what makes the matrix real — without it both jobs ran the same 3.12.
+      - name: Create the environment
+        run: |
+          uv python install ${{ matrix.python-version }}
+          uv venv --python ${{ matrix.python-version }}
+
       - name: Install
-        run: uv pip install --system -e ".[contree,dev]"
+        run: uv pip install -e ".[contree,dev]"
+
+      - name: Confirm the interpreter under test
+        run: uv run python -c "import sys; print(sys.version)"
 
       - name: Lint
-        run: ruff check .
+        run: uv run ruff check .
 
       - name: Test
         # No network and no credentials: a scripted model stands in for Nemotron
         # and directory snapshots for Nebius Sandboxes.
-        run: pytest -q
+        run: uv run pytest -q
 
       - name: Build the web UI
         if: matrix.python-version == '3.12'
@@ -42,10 +53,15 @@ jobs:
           npm install --no-audit --no-fund
           npm run build
 
-      - name: The bundled example really is broken
+      - name: The bundled fixtures really are broken
         run: |
-          cd examples/broken-invoice
-          if python -m pytest -q; then
-            echo "::error::examples/broken-invoice is supposed to fail — the demo target is stale"
-            exit 1
-          fi
+          set +e
+          for case in examples/broken-invoice evals/cases/regression-trap \
+                      evals/cases/outside-knowledge evals/cases/masked-faults; do
+            uv run pytest "$case" -q > /dev/null 2>&1
+            if [ $? -eq 0 ]; then
+              echo "::error::$case is supposed to fail — the fixture is stale"
+              exit 1
+            fi
+            echo "ok: $case still fails as designed"
+          done

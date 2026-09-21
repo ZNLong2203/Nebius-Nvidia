@@ -54,8 +54,9 @@ jobs:
 
       - name: Test
         # No network and no credentials: a scripted model stands in for Nemotron
-        # and directory snapshots for Nebius Sandboxes.
-        run: uv run pytest -q
+        # and directory snapshots for Nebius Sandboxes. Coverage below 80% fails
+        # the build; it was 86% when the gate went in.
+        run: uv run pytest -q --cov=arborist --cov-report=term-missing:skip-covered --cov-fail-under=80
 
       - name: Test and build the web UI
         if: matrix.python-version == '3.12'

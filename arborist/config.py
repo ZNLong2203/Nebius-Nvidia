@@ -61,6 +61,13 @@ class Settings:
     # --- sandbox -------------------------------------------------------------
     default_image: str = "python:3.12-slim"
     exec_timeout: float = 900.0
+    workdir: str = "/workspace"
+    """Where the repository lives inside the sandbox.
+
+    Images that already contain a checked-out, installed project -- SWE-bench's
+    put it at ``/testbed`` -- need the patch written over that copy rather than
+    beside it.
+    """
 
     # --- serving -------------------------------------------------------------
     runs_dir: str = "runs"
@@ -97,6 +104,7 @@ def load_settings(**overrides) -> Settings:
         max_nodes=_int("ARBORIST_MAX_NODES", Settings.max_nodes),
         max_depth=_int("ARBORIST_MAX_DEPTH", Settings.max_depth),
         token_budget=_int("ARBORIST_TOKEN_BUDGET", Settings.token_budget),
+        workdir=os.environ.get("ARBORIST_WORKDIR") or Settings.workdir,
         runs_dir=os.environ.get("ARBORIST_RUNS_DIR") or Settings.runs_dir,
         demo_run=os.environ.get("ARBORIST_DEMO_RUN", ""),
     )

@@ -102,13 +102,14 @@ class _FakeSdk:
         return _FakeInfo(self._permissions)
 
 
-def _backend_with(sdk):
+def _backend_with(sdk, workdir="/workspace"):
     """A ContreeBackend whose SDK is stubbed, so preflight can be exercised."""
     from arborist.sandbox import ContreeBackend
 
     backend = ContreeBackend.__new__(ContreeBackend)
     backend._sdk = sdk
     backend._timeout = 1.0
+    backend._workdir = workdir
     backend._forks = 0
     return backend
 
@@ -157,3 +158,67 @@ def test_local_backend_resolves_python_to_this_interpreter():
         assert result.stdout.strip() == sys.prefix
     finally:
         backend.close()
+
+
+class _FakeState:
+    """Stands in for a ConTree image or checkpoint: runnable, and records how."""
+
+    def __init__(self, log, uuid="c0"):
+        self._log = log
+        self.uuid = uuid
+        self.exit_code = 0
+        self.stdout = ""
+        self.stderr = ""
+
+    def run(self, **kwargs):
+        self._log.append(kwargs)
+        return _FakeState(self._log, uuid=f"c{len(self._log)}")
+
+    def wait(self):
+        return self
+
+    def read(self, path):
+        self._log.append({"read": path})
+        return b""
+
+
+class _FakeImages:
+    def __init__(self, log):
+        self._log = log
+        self.refs = []
+
+    def oci(self, ref, timeout=None):
+        self.refs.append(ref)
+        return _FakeState(self._log)
+
+    def use(self, ref):  # pragma: no cover - fails the test if reached
+        raise AssertionError("use() only finds images already imported")
+
+
+def test_an_image_is_imported_when_the_project_does_not_have_it():
+    log = []
+    sdk = _FakeSdk({"spawn": True, "import": True})
+    sdk.images = _FakeImages(log)
+    backend = _backend_with(sdk)
+
+    backend.base({"a.py": b"x"}, "docker.io/org/image:tag")
+    assert sdk.images.refs == ["docker.io/org/image:tag"]
+
+
+def test_the_workdir_is_where_files_land_commands_run_and_reports_are_read():
+    """SWE-bench images keep the installed project at /testbed, not /workspace."""
+    log = []
+    sdk = _FakeSdk({"spawn": True, "import": True})
+    sdk.images = _FakeImages(log)
+    backend = _backend_with(sdk, workdir="/testbed")
+
+    base = backend.base({"pkg/a.py": b"x"}, "img")
+    assert list(log[0]["files"]) == ["/testbed/pkg/a.py"]
+
+    backend.run(base, "pytest -q", files={"pkg/a.py": b"y"})
+    assert log[1]["cwd"] == "/testbed"
+    assert list(log[1]["files"]) == ["/testbed/pkg/a.py"]
+
+    backend.read(base, ".arborist/report.xml")
+    assert log[2] == {"read": "/testbed/.arborist/report.xml"}
+

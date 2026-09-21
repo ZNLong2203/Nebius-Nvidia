@@ -49,9 +49,9 @@ from contree_sdk import ContreeSync
 from contree_sdk.auth import IAMAuth
 from contree_sdk.config import ContreeConfig
 
-# The `ContreeSync(token=..., base_url=...)` shorthand leaves project_id at its
-# default, and every Sandboxes request carries a `Project` header -- without it
-# the API answers 400 before doing anything.
+# Every Sandboxes request is scoped to a project. The SDK falls back to
+# NEBIUS_PROJECT_ID from the environment; passing it explicitly means a missing
+# value fails here, legibly, instead of as a 403 that reads like missing access.
 sdk = ContreeSync(
     ContreeConfig(auth=IAMAuth(token=NEBIUS_API_KEY, project_id=NEBIUS_PROJECT_ID,
                                base_url=CONTREE_BASE_URL))
@@ -120,10 +120,14 @@ runs a **preflight** on construction: it calls `whoami`, checks for `spawn` and
 
 Two things that look like problems and are not:
 
-- **`Token expires in 0 hours`** — the SDK warns because the session token it
-  holds is short-lived. It rolls automatically; the underlying key is unaffected.
-- **`Missing "Project" header`** — that is `NEBIUS_PROJECT_ID`, not an auth
-  failure. See below.
+- **`Token expires in 0 hours`** — `whoami` reports a rolling session that
+  always ends five minutes out, and the SDK warns below 24 hours. Verified
+  harmless: a client reused 400 seconds after creation still ran, and its
+  checkpoint still held its files. `ContreeBackend` zeroes the threshold so the
+  warning does not greet every run.
+- **A 403 when access *has* been granted** — that is a missing
+  `NEBIUS_PROJECT_ID`, not an entitlement problem, even though the message is
+  word for word the same. See below.
 
 Until access is granted, `--backend local` exercises the identical search over
 directory snapshots.
@@ -134,7 +138,7 @@ directory snapshots.
 |---|---|---|
 | `NEBIUS_API_KEY` | — | Same key as inference |
 | `CONTREE_BASE_URL` | `https://api.tokenfactory.nebius.com/sandboxes` | Sandboxes control plane |
-| `NEBIUS_PROJECT_ID` | — | **Required.** Sent as the `Project` header on every request; a missing value is a 400 |
+| `NEBIUS_PROJECT_ID` | — | **Required.** Sent as the `Project` header on every request. Missing, it surfaces as a `400 Missing "Project" header` or, through the SDK, a 403 indistinguishable from missing Beta access |
 | `ARBORIST_BACKEND` | `contree` | `contree` or `local` |
 
 The OCI image comes from `--image` (default `python:3.12-slim`). Any registry
@@ -153,6 +157,41 @@ It provides **no isolation** and is not the product. It exists for two reasons:
 2. it makes the cost of *not* having ConTree concrete — a fork is a `copytree`,
    which is exactly the work branching removes.
 
+## Measured on the Beta
+
+Everything above this section was written before Sandboxes access was granted.
+These figures were measured on the live service on 2026-09-21, `contree-sdk`
+0.3.6, image `python:3.12-slim`.
+
+| Measure | Result |
+|---|---|
+| `base()` — import image, upload files, first checkpoint | 1.6 s |
+| `run()` of a trivial command from a checkpoint | 0.9 s |
+| 1 fork running `sleep 5` | 5.8 s |
+| 4 forks of one checkpoint, concurrently | 6.7 s wall (3.4× over serial) |
+| 8 forks of one checkpoint, concurrently | 7.1 s wall (6.6× over serial) |
+| Account limits reported by `whoami` | 50 concurrent instances, 8 concurrent imports, 3600 s max |
+
+**Forks are genuinely parallel.** This was the claim the design rests on, and
+it held: eight rival evaluations from one warm state cost barely more wall time
+than one.
+
+**The first end-to-end run** — `examples/broken-invoice`, fan-out 3, node cap
+8 — solved in 182 s: six patches, eight sandbox executions, green at depth 3.
+Of those 182 seconds, **18 were spent in the sandbox**. The setup step
+(`pip install pytest`) took 5.2 s and ran once; the six evaluations that forked
+from it instead of repeating it saved 31 s.
+
+Two consequences worth stating plainly:
+
+- **On this workload the model is the bottleneck, not the sandbox.** Execution
+  is about a tenth of wall time. Making Sandboxes faster would barely move a
+  run; running more candidates per model call would.
+- **Setup savings scale with the install, and these installs are small.** A
+  five-second `pip install` makes the saving real but modest. The case for
+  forking on these repos is parallel evaluation and free backtracking; the
+  setup argument grows with the project, as the model below describes.
+
 ## Cost model
 
 Let **s** be the setup time, **t** a test run, **k** the fan-out and **d** the depth.
@@ -163,7 +202,8 @@ Let **s** be the setup time, **t** a test run, **k** the fan-out and **d** the d
 | Arborist | `k·d + 1` | `1·s` |
 
 At the default `k=4`, `d=3`, on a repo with a 45-second install: 9 minutes of
-repeated setup versus 45 seconds. `stats.setup_seconds_saved` reports the measured
+repeated setup versus 45 seconds. That line is arithmetic; the measured figure
+for the five-second installs in this repository is in the section above. `stats.setup_seconds_saved` reports the measured
 figure for each run, and `evals/run_eval.py` measures both modes side by side.
 
 ## Failure handling

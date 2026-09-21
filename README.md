@@ -2,6 +2,14 @@
 
 **A coding agent that repairs a failing repository by searching a tree of sandbox states instead of walking one line of attempts.**
 
+[![CI](https://github.com/ZNLong2203/Nebius-Nvidia/actions/workflows/ci.yml/badge.svg)](https://github.com/ZNLong2203/Nebius-Nvidia/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-2ea44f)](https://znlong2203.github.io/Nebius-Nvidia/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
+**[Open the live demo →](https://znlong2203.github.io/Nebius-Nvidia/)** — a real search, recorded on Nebius Sandboxes. Every branch is clickable: its hypothesis, its patch, the tests it fixed and the tests it broke.
+
+![A search tree recorded on Nebius Sandboxes: rival patches forked from one checkpoint, the winning chain in green](docs/assets/demo.png)
+
 Built for the [Nebius x NVIDIA Global AI Hackathon](https://nebiusglobalaihackathon.devpost.com/) — *Coding and Agentic Engineering* track. Runs on **Nebius Token Factory**: NVIDIA **Nemotron 3** for every model call, **Nebius Sandboxes** for every execution.
 
 ---
@@ -96,6 +104,8 @@ All three are served through **Nebius Token Factory**'s OpenAI-compatible endpoi
 
 ## Quick start
 
+Python 3.11 or newer.
+
 ```bash
 git clone https://github.com/ZNLong2203/Nebius-Nvidia.git
 cd Nebius-Nvidia
@@ -103,7 +113,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[contree,dev]"
 
 cp .env.example .env     # add NEBIUS_API_KEY (and TAVILY_API_KEY if you have one)
-pytest -q                # 134 tests, no key needed — everything runs offline
+pytest -q                # 168 tests, no key needed — everything runs offline
 ```
 
 Get a key at [tokenfactory.nebius.com](https://tokenfactory.nebius.com). Hackathon participants get $25 in credits with the code `NEBIUS-DEVPOST-GLOBAL26`.
@@ -127,6 +137,18 @@ arborist fix examples/broken-invoice \
 ```
 
 You get a live tree in the terminal, then the winning diff, the token spend per tier, and a JSON report in `runs/`.
+
+### Repair against an issue, with the tests locked
+
+```bash
+arborist fix path/to/repo --goal @ISSUE.md --protect "tests/*"
+```
+
+`--goal` puts the issue text in front of every model call. `--protect` refuses,
+before it runs, any patch that edits a matching file — so a green suite means
+the code was fixed, not the tests rewritten to agree with it. It is how the
+[SWE-bench runs](evals/swebench/README.md) keep the benchmark's tests as the
+judge.
 
 ### Watch it search
 
@@ -172,7 +194,7 @@ python evals/run_eval.py --cases all
 
 Runs every case twice under an identical budget, branching on and off, and writes `evals/results.md` with: solved yes/no, tests passing before and after, patches evaluated, sandbox executions, **how many times setup had to run**, invalid patches, wall time, and tokens per tier.
 
-Three cases ship. The answer keys live in [`evals/README.md`](evals/README.md),
+Four cases ship: the bundled example and three in `evals/cases`. The answer keys live in [`evals/README.md`](evals/README.md),
 never inside a case — anything inside is loaded into the agent's context, and a
 demo that reads its own answer key proves nothing.
 
@@ -182,6 +204,13 @@ Nano 30B A3B, gpt-oss 120B against Super), so a model comparison changes the
 model and nothing else.
 
 ### What the numbers actually show
+
+> **Being re-measured on Nebius Sandboxes.** The numbers in this section come
+> from the local backend. Since then two more fixes have landed, and like the
+> three before them both favoured the branching arm: a fruitless expansion
+> ended a linear run outright, and a linear run got a third of the attempts
+> per state that a branching run did. The full comparison is re-running on
+> Sandboxes with both fixed; its table will replace this one.
 
 Two findings, and only one of them is the one this project set out to make.
 
@@ -232,9 +261,9 @@ visible as the regression it is rather than as progress (see `Arborist.score`),
 and forking a warm checkpoint paid the environment setup **once** against the
 baseline's thirteen times.
 
-> Results in `evals/results.md` are whatever your own run produces. Numbers are
-> not checked in, because a benchmark table you cannot reproduce is worth
-> nothing.
+> Every results table is checked in, stamped with the commit that produced it
+> (`evals/results*.md`), and the run trees behind the claims are in
+> [`evals/evidence/`](evals/evidence/). Rerun them with the command above.
 
 ---
 
@@ -260,7 +289,7 @@ The loop, once per iteration:
 1. **Select** the highest-scoring unexpanded node, shallowest first — breadth is cheaper than depth, so it is spent first.
 2. **Diagnose** with Super (or Ultra if the search has stalled): root cause plus up to `k` *distinct* hypotheses. If the failure points outside the repo, Tavily is called and diagnosis re-runs with the evidence.
 3. **Propose** one patch per hypothesis with Nano, in parallel.
-4. **Validate before executing.** Each edit quotes an exact snippet that must appear exactly once in the file. A patch that does not apply is marked invalid and **never reaches the sandbox** — it costs tokens, not wall-clock. (Reindented snippets get one relaxed second chance; ambiguous ones do not.)
+4. **Validate before executing.** Each edit quotes an exact snippet that must appear exactly once in the file, may not touch a protected file, and must leave Python parseable. A whole-file rewrite is first stripped of regions that change nothing but formatting (same syntax tree, same comments), so the diff holds only the fix. A patch that fails gets one repair attempt with the reason fed back; one that still does not apply is marked invalid and **never reaches the sandbox** — it costs tokens, not wall-clock. (Reindented snippets get one relaxed second chance; ambiguous ones do not.)
 5. **Evaluate**: fork the parent checkpoint, upload only the changed files, run the suite with `--junitxml`, read the report back out of that state.
 6. **Score** against the parent's test identities: pass rate, minus a hard penalty for every test that used to pass and no longer does.
 7. **Branch, prune, repeat.** Green ends the run. Regressions are recorded in the tree and never forked from.
@@ -269,7 +298,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 
 ### Two backends, one contract
 
-`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 131 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
+`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 168 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
 
 ---
 
@@ -279,7 +308,9 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 pytest -q
 ```
 
-131 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
+168 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
+
+CI runs them on Python 3.11, 3.12 and 3.13, fails the build below 80% line coverage (86% today), runs the interface's unit tests with `npm test` in `web/`, and checks that every bundled fixture is still broken.
 
 ---
 

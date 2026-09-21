@@ -1,0 +1,363 @@
+{
+  "run_id": "run-476c7532",
+  "solved": true,
+  "winner_id": "n-6ba300f6",
+  "diff": "--- a/src/billing/invoice.py\n+++ b/src/billing/invoice.py\n@@ -32,5 +32,6 @@\n     money they never paid.\n     \"\"\"\n     subtotal = round_money(sum(line_total(line) for line in lines))\n-    taxed = subtotal + pct(subtotal, tax_pct)\n-    return round_money(max(0.0, taxed - coupon))\n+    taxable_base = round_money(max(0.0, subtotal - coupon))\n+    tax = pct(taxable_base, tax_pct)\n+    return round_money(taxable_base + tax)\n--- a/src/billing/money.py\n+++ b/src/billing/money.py\n@@ -1,9 +1,10 @@\n-\"\"\"Money helpers.\n+'''Money helpers.\n \n Every amount in this package is a float number of currency units, rounded to\n two decimal places at each boundary.\n-\"\"\"\n+'''\n \n+from decimal import Decimal, ROUND_HALF_UP\n \n def round_money(amount: float) -> float:\n     \"\"\"Round a monetary amount to two decimal places.\n@@ -11,7 +12,7 @@\n     Half-cent amounts must round away from zero, the way an invoice reader\n     expects: 2.675 -> 2.68, not 2.67.\n     \"\"\"\n-    return round(amount, 2)\n+    return float(Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))\n \n \n def pct(value: float, percent: float) -> float:\n--- a/src/billing/proration.py\n+++ b/src/billing/proration.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a subscription that runs from the 1st to the\n     30th is billed for 30 days, not 29.\n     \"\"\"\n-    return (end - start).days\n+    return (end - start).days + 1\n \n \n def prorate(monthly_price: float, start: date, end: date, days_in_month: int = 30) -> float:\n",
+  "baseline": {
+    "total": 9,
+    "passed": 5,
+    "failed": 4,
+    "errors": 0,
+    "skipped": 0,
+    "failed_ids": [
+      "tests.test_billing::test_billed_days_is_inclusive",
+      "tests.test_billing::test_coupon_reduces_the_taxable_base",
+      "tests.test_billing::test_prorate_charges_inclusive_days",
+      "tests.test_billing::test_round_money_rounds_half_away_from_zero"
+    ],
+    "collection_error": false,
+    "green": false
+  },
+  "final": {
+    "total": 9,
+    "passed": 9,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "failed_ids": [],
+    "collection_error": false,
+    "green": true
+  },
+  "nodes": [
+    {
+      "id": "n-6f77cdb1",
+      "parent_id": null,
+      "depth": 0,
+      "checkpoint_id": "1374d995-0675-4ccc-ace0-92d919455fe0",
+      "hypothesis": null,
+      "diagnosis": "",
+      "edits": [],
+      "explanation": "",
+      "report": {
+        "total": 9,
+        "passed": 5,
+        "failed": 4,
+        "errors": 0,
+        "skipped": 0,
+        "failed_ids": [
+          "tests.test_billing::test_billed_days_is_inclusive",
+          "tests.test_billing::test_coupon_reduces_the_taxable_base",
+          "tests.test_billing::test_prorate_charges_inclusive_days",
+          "tests.test_billing::test_round_money_rounds_half_away_from_zero"
+        ],
+        "collection_error": false,
+        "green": false
+      },
+      "score": 0.5556,
+      "status": "failed",
+      "regressions": [],
+      "fixed": [],
+      "stdout_tail": "F..F..FF.                                                                [100%]\n=================================== FAILURES ===================================\n_________________ test_round_money_rounds_half_away_from_zero __________________\n\n    def test_round_money_rounds_half_away_from_zero():\n>       assert round_money(2.675) == 2.68\nE       assert 2.67 == 2.68\nE        +  where 2.67 = round_money(2.675)\n\ntests/test_billing.py:10: AssertionError\n_____________________ test_coupon_reduces_the_taxable_base _____________________\n\n    def test_coupon_reduces_the_taxable_base():\n        lines = [InvoiceLine(\"widget\", quantity=1, unit_price=100.0)]\n        # 100 - 20 coupon = 80 taxable, then 10% tax = 88.00\n>       assert invoice_total(lines, tax_pct=10.0, coupon=20.0) == 88.0\nE       AssertionError: assert 90.0 == 88.0\nE        +  where 90.0 = invoice_total([InvoiceLine(description='widget', quantity=1, unit_price=100.0, line_discount_pct=0.0)], tax_pct=10.0, coupon=20.0)\n\ntests/test_billing.py:27: AssertionError\n________________________ test_billed_days_is_inclusive _________________________\n\n    def test_billed_days_is_inclusive():\n>       assert billed_days(date(2026, 4, 1), date(2026, 4, 30)) == 30\nE       assert 29 == 30\nE        +  where 29 = billed_days(datetime.date(2026, 4, 1), datetime.date(2026, 4, 30))\nE        +    where datetime.date(2026, 4, 1) = date(2026, 4, 1)\nE        +    and   datetime.date(2026, 4, 30) = date(2026, 4, 30)\n\ntests/test_billing.py:41: AssertionError\n_____________________ test_prorate_charges_inclusive_days ______________________\n\n    def test_prorate_charges_inclusive_days():\n        charge = prorate(30.0, date(2026, 4, 1), date(2026, 4, 15), days_in_month=30)\n>       assert charge == 15.0\nE       assert 14.0 == 15.0\n\ntests/test_billing.py:46: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_billing.py::test_round_money_rounds_half_away_from_zero - a...\nFAILED tests/test_billing.py::test_coupon_reduces_the_taxable_base - Assertio...\nFAILED tests/test_billing.py::test_billed_days_is_inclusive - assert 29 == 30\nFAILED tests/test_billing.py::test_prorate_charges_inclusive_days - assert 14...\n4 failed, 5 passed in 0.04s\n",
+      "model_tier": "",
+      "wall_seconds": 0.0,
+      "expanded": true,
+      "expansions": 1,
+      "note": "baseline"
+    },
+    {
+      "id": "n-0da93270",
+      "parent_id": "n-6f77cdb1",
+      "depth": 1,
+      "checkpoint_id": "e5cfdd20-87b0-467a-a204-c99e868f4d1b",
+      "hypothesis": {
+        "id": "h-8cba4f1a",
+        "title": "Fix round_money to round half away from zero",
+        "rationale": "The test expects round_money(2.675) to return 2.68, but Python's round() uses round-half-to-even, giving 2.67. The same applies to 1.005 expecting 1.01. A custom rounding implementation is needed.",
+        "target_files": [
+          "src/billing/money.py"
+        ],
+        "strategy": "Replace round(amount, 2) with a function that rounds half away from zero, e.g., using Decimal quantize with ROUND_HALF_UP."
+      },
+      "diagnosis": "The billed_days function in src/billing/proration.py returns the number of days between start and end exclusive of the end date, but the specification requires inclusive counting (both start and end included).",
+      "edits": [
+        {
+          "path": "src/billing/money.py",
+          "search": null,
+          "replace": null,
+          "new_content": "'''Money helpers.\n\nEvery amount in this package is a float number of currency units, rounded to\ntwo decimal places at each boundary.\n'''\n\nfrom decimal import Decimal, ROUND_HALF_UP\n\ndef round_money(amount: float) -> float:\n    \"\"\"Round a monetary amount to two decimal places.\n\n    Half-cent amounts must round away from zero, the way an invoice reader\n    expects: 2.675 -> 2.68, not 2.67.\n    \"\"\"\n    return float(Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))\n\n\ndef pct(value: float, percent: float) -> float:\n    \"\"\"Apply a percentage to a value.\"\"\"\n    return value * (percent / 100.0)\n"
+        }
+      ],
+      "explanation": "Replace the round_money implementation with a Decimal-based rounding that rounds half away from zero, as required by the hypothesis.",
+      "report": {
+        "total": 9,
+        "passed": 6,
+        "failed": 3,
+        "errors": 0,
+        "skipped": 0,
+        "failed_ids": [
+          "tests.test_billing::test_billed_days_is_inclusive",
+          "tests.test_billing::test_coupon_reduces_the_taxable_base",
+          "tests.test_billing::test_prorate_charges_inclusive_days"
+        ],
+        "collection_error": false,
+        "green": false
+      },
+      "score": 0.6667,
+      "status": "improved",
+      "regressions": [],
+      "fixed": [
+        "tests.test_billing::test_round_money_rounds_half_away_from_zero"
+      ],
+      "stdout_tail": "...F..FF.                                                                [100%]\n=================================== FAILURES ===================================\n_____________________ test_coupon_reduces_the_taxable_base _____________________\n\n    def test_coupon_reduces_the_taxable_base():\n        lines = [InvoiceLine(\"widget\", quantity=1, unit_price=100.0)]\n        # 100 - 20 coupon = 80 taxable, then 10% tax = 88.00\n>       assert invoice_total(lines, tax_pct=10.0, coupon=20.0) == 88.0\nE       AssertionError: assert 90.0 == 88.0\nE        +  where 90.0 = invoice_total([InvoiceLine(description='widget', quantity=1, unit_price=100.0, line_discount_pct=0.0)], tax_pct=10.0, coupon=20.0)\n\ntests/test_billing.py:27: AssertionError\n________________________ test_billed_days_is_inclusive _________________________\n\n    def test_billed_days_is_inclusive():\n>       assert billed_days(date(2026, 4, 1), date(2026, 4, 30)) == 30\nE       assert 29 == 30\nE        +  where 29 = billed_days(datetime.date(2026, 4, 1), datetime.date(2026, 4, 30))\nE        +    where datetime.date(2026, 4, 1) = date(2026, 4, 1)\nE        +    and   datetime.date(2026, 4, 30) = date(2026, 4, 30)\n\ntests/test_billing.py:41: AssertionError\n_____________________ test_prorate_charges_inclusive_days ______________________\n\n    def test_prorate_charges_inclusive_days():\n        charge = prorate(30.0, date(2026, 4, 1), date(2026, 4, 15), days_in_month=30)\n>       assert charge == 15.0\nE       assert 14.0 == 15.0\n\ntests/test_billing.py:46: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_billing.py::test_coupon_reduces_the_taxable_base - Assertio...\nFAILED tests/test_billing.py::test_billed_days_is_inclusive - assert 29 == 30\nFAILED tests/test_billing.py::test_prorate_charges_inclusive_days - assert 14...\n3 failed, 6 passed in 0.03s\n",
+      "model_tier": "nano",
+      "wall_seconds": 72.22,
+      "expanded": true,
+      "expansions": 1,
+      "note": "applied on retry after: src/billing/money.py: search block not found"
+    },
+    {
+      "id": "n-66853f3c",
+      "parent_id": "n-6f77cdb1",
+      "depth": 1,
+      "checkpoint_id": null,
+      "hypothesis": {
+        "id": "h-29ced8a8",
+        "title": "Fix billed_days to be inclusive",
+        "rationale": "The test expects billed_days(date(2026,4,1), date(2026,4,30)) to return 30, but currently returns 29. Similarly, prorate uses billed_days and expects 15 days for April 1 to April 15, but gets 14. Changing billed_days to (end - start).days + 1 will make the range inclusive.",
+        "target_files": [
+          "src/billing/proration.py"
+        ],
+        "strategy": "Modify the billed_days function to add 1 to the day difference."
+      },
+      "diagnosis": "The billed_days function in src/billing/proration.py returns the number of days between start and end exclusive of the end date, but the specification requires inclusive counting (both start and end included).",
+      "edits": [
+        {
+          "path": "src/billing/proration.py",
+          "search": null,
+          "replace": null,
+          "new_content": "\"\"\"Prorated charges for partial billing periods.\"\"\"\n\nfrom .money import round_money\n\n\\ndef billed_days(start: date, end: date) -> int:\n    \"\"\"Number of days billed for a period.\n\n    Both endpoints are inclusive: a subscription that runs from the 1st to the\n    30th is billed for 30 days, not 29.\n    \"\"\"\n    return (end - start).days + 1\n\n\\ndef prorate(monthly_price: float, start: date, end: date, days_in_month: int = 30) -> float:\n    \"\"\"Charge for a partial month.\"\"\"\n    if days_in_month <= 0:\n        raise ValueError(\"days_in_month must be positive\")\n    days = billed_days(start, end)\n    return round_money(monthly_price * days / days_in_month)\n"
+        }
+      ],
+      "explanation": "Modify billed_days to add 1 to the day difference to make the range inclusive, matching the specification and fixing failing tests.",
+      "report": null,
+      "score": 0.0,
+      "status": "invalid",
+      "regressions": [],
+      "fixed": [],
+      "stdout_tail": "",
+      "model_tier": "nano",
+      "wall_seconds": 120.21,
+      "expanded": false,
+      "expansions": 0,
+      "note": "src/billing/proration.py: the patched file is not valid Python (line 1: unterminated triple-quoted string literal (detected at line 24)). Send the file again, complete and unescaped. (retry: src/billing/proration.py: the patched file is not valid Python (line 5: unexpected character after line continuation character). Send the file again, complete and unescaped.)"
+    },
+    {
+      "id": "n-656b6db4",
+      "parent_id": "n-6f77cdb1",
+      "depth": 1,
+      "checkpoint_id": null,
+      "hypothesis": {
+        "id": "h-edb91276",
+        "title": "Fix invoice_total to apply coupon before tax",
+        "rationale": "The test expects invoice_total with coupon=20 to return 88.0, but currently returns 90.0 because the coupon is subtracted after tax. The specification states the coupon reduces the taxable base, so it should be subtracted before calculating tax.",
+        "target_files": [
+          "src/billing/invoice.py"
+        ],
+        "strategy": "Change the calculation: compute subtotal, subtract coupon (clamped at >=0), then apply tax on the result, and round."
+      },
+      "diagnosis": "The billed_days function in src/billing/proration.py returns the number of days between start and end exclusive of the end date, but the specification requires inclusive counting (both start and end included).",
+      "edits": [],
+      "explanation": "",
+      "report": null,
+      "score": 0.0,
+      "status": "invalid",
+      "regressions": [],
+      "fixed": [],
+      "stdout_tail": "",
+      "model_tier": "nano",
+      "wall_seconds": 177.86,
+      "expanded": false,
+      "expansions": 0,
+      "note": "src/billing/invoice.py: the patched file is not valid Python (line 1: unterminated triple-quoted string literal (detected at line 1)). Send the file again, complete and unescaped. (retry: patch contains no edits)"
+    },
+    {
+      "id": "n-2a59d04f",
+      "parent_id": "n-0da93270",
+      "depth": 2,
+      "checkpoint_id": "448942e4-dc3e-4463-a29a-37f5a0701651",
+      "hypothesis": {
+        "id": "h-a6225a8d",
+        "title": "Fix billed_days to be inclusive",
+        "rationale": "billed_days returns (end - start).days which excludes the end date. Adding 1 makes it inclusive as required by the docstring and tests.",
+        "target_files": [
+          "src/billing/proration.py"
+        ],
+        "strategy": "Change return (end - start).days to return (end - start).days + 1"
+      },
+      "diagnosis": "Multiple issues: 1) billed_days off-by-one error causing two failures, 2) invoice_total applies coupon after tax instead of before.",
+      "edits": [
+        {
+          "path": "src/billing/proration.py",
+          "search": "    return (end - start).days",
+          "replace": "    return (end - start).days + 1",
+          "new_content": null
+        }
+      ],
+      "explanation": "The billed_days function currently returns (end - start).days which excludes the end date; adding 1 makes the period inclusive as required by the docstring and tests.",
+      "report": {
+        "total": 9,
+        "passed": 8,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "failed_ids": [
+          "tests.test_billing::test_coupon_reduces_the_taxable_base"
+        ],
+        "collection_error": false,
+        "green": false
+      },
+      "score": 0.8889,
+      "status": "improved",
+      "regressions": [],
+      "fixed": [
+        "tests.test_billing::test_billed_days_is_inclusive",
+        "tests.test_billing::test_prorate_charges_inclusive_days"
+      ],
+      "stdout_tail": "...F.....                                                                [100%]\n=================================== FAILURES ===================================\n_____________________ test_coupon_reduces_the_taxable_base _____________________\n\n    def test_coupon_reduces_the_taxable_base():\n        lines = [InvoiceLine(\"widget\", quantity=1, unit_price=100.0)]\n        # 100 - 20 coupon = 80 taxable, then 10% tax = 88.00\n>       assert invoice_total(lines, tax_pct=10.0, coupon=20.0) == 88.0\nE       AssertionError: assert 90.0 == 88.0\nE        +  where 90.0 = invoice_total([InvoiceLine(description='widget', quantity=1, unit_price=100.0, line_discount_pct=0.0)], tax_pct=10.0, coupon=20.0)\n\ntests/test_billing.py:27: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_billing.py::test_coupon_reduces_the_taxable_base - Assertio...\n1 failed, 8 passed in 0.03s\n",
+      "model_tier": "nano",
+      "wall_seconds": 16.79,
+      "expanded": true,
+      "expansions": 1,
+      "note": ""
+    },
+    {
+      "id": "n-1394ba22",
+      "parent_id": "n-0da93270",
+      "depth": 2,
+      "checkpoint_id": null,
+      "hypothesis": {
+        "id": "h-1fe5ee6a",
+        "title": "Apply coupon before tax in invoice_total",
+        "rationale": "The coupon should reduce the taxable base per function docstring. Current code applies tax then subtracts coupon, leading to excess tax.",
+        "target_files": [
+          "src/billing/invoice.py"
+        ],
+        "strategy": "Subtract coupon from subtotal before calculating tax, ensuring non-negative taxable base."
+      },
+      "diagnosis": "Multiple issues: 1) billed_days off-by-one error causing two failures, 2) invoice_total applies coupon after tax instead of before.",
+      "edits": [
+        {
+          "path": "src/billing/invoice.py",
+          "search": "    subtotal = round_money(sum(line_total(line) for line in lines))\\n    taxed = subtotal + pct(subtotal, tax_pct)\\n    return round_money(max(0.0, taxed - coupon))",
+          "replace": "    subtotal = round_money(sum(line_total(line) for line in lines))\\n    taxable = max(0.0, subtotal - coupon)\\n    taxed = taxable + pct(taxable, tax_pct)\\n    return round_money(taxed)",
+          "new_content": null
+        }
+      ],
+      "explanation": "Apply coupon before tax by moving coupon subtraction to before tax calculation, ensuring non\u2011negative taxable base.",
+      "report": null,
+      "score": 0.0,
+      "status": "invalid",
+      "regressions": [],
+      "fixed": [],
+      "stdout_tail": "",
+      "model_tier": "nano",
+      "wall_seconds": 54.3,
+      "expanded": false,
+      "expansions": 0,
+      "note": "patch contains no edits (retry: src/billing/invoice.py: search block not found)"
+    },
+    {
+      "id": "n-6ba300f6",
+      "parent_id": "n-2a59d04f",
+      "depth": 3,
+      "checkpoint_id": "a51c8fcf-437e-4672-94d4-c39131d72447",
+      "hypothesis": {
+        "id": "h-79dacf8c",
+        "title": "Coupon applied post-tax",
+        "rationale": "",
+        "target_files": [
+          "src/billing/invoice.py"
+        ],
+        "strategy": "Modify invoice_total to subtract coupon from subtotal before calculating tax, ensuring non-negative taxable base."
+      },
+      "diagnosis": "The invoice_total function applies the coupon after tax instead of before tax, violating the documented order of operations where the coupon reduces the taxable base.",
+      "edits": [
+        {
+          "path": "src/billing/invoice.py",
+          "search": null,
+          "replace": null,
+          "new_content": "'''Invoice totals.'''\n\nfrom dataclasses import dataclass\n\nfrom .money import pct, round_money\n\n\n@dataclass\nclass InvoiceLine:\n    description: str\n    quantity: int\n    unit_price: float\n    line_discount_pct: float = 0.0\n\n\ndef line_total(line: InvoiceLine) -> float:\n    \"\"\"Total for a single line, after its own discount.\"\"\"\n    gross = line.quantity * line.unit_price\n    return round_money(gross - pct(gross, line.line_discount_pct))\n\n\ndef invoice_total(\n    lines: list[InvoiceLine],\n    tax_pct: float = 0.0,\n    coupon: float = 0.0,\n) -> float:\n    \"\"\"Total payable for an invoice.\n\n    Order of operations matters. A coupon is a reduction of the taxable base,\n    so it comes off the subtotal *before* tax is calculated -- not off the\n    grand total afterwards, which would silently charge the customer tax on\n    money they never paid.\n    \"\"\"\n    subtotal = round_money(sum(line_total(line) for line in lines))\n    taxable_base = round_money(max(0.0, subtotal - coupon))\n    tax = pct(taxable_base, tax_pct)\n    return round_money(taxable_base + tax)\n"
+        }
+      ],
+      "explanation": "Fix coupon application order: subtract coupon from subtotal before tax is calculated, then compute tax on the reduced amount to ensure the coupon reduces the taxable base as documented.",
+      "report": {
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "failed_ids": [],
+        "collection_error": false,
+        "green": true
+      },
+      "score": 1.0,
+      "status": "green",
+      "regressions": [],
+      "fixed": [
+        "tests.test_billing::test_coupon_reduces_the_taxable_base"
+      ],
+      "stdout_tail": ".........                                                                [100%]\n9 passed in 0.02s\n",
+      "model_tier": "nano",
+      "wall_seconds": 38.19,
+      "expanded": false,
+      "expansions": 0,
+      "note": ""
+    }
+  ],
+  "stats": {
+    "backend": "contree",
+    "branching": true,
+    "wall_seconds": 368.94,
+    "sandbox_executions": 5,
+    "sandbox_seconds": 15.25,
+    "setup_seconds": 5.14,
+    "setup_runs": 1,
+    "setup_seconds_saved": 30.83,
+    "nodes": 7,
+    "cancelled": false,
+    "patches_evaluated": 6,
+    "invalid_patches": 3,
+    "forks": 5,
+    "tavily_queries": []
+  },
+  "usage": {
+    "by_tier": {
+      "nano": {
+        "calls": 10,
+        "prompt_tokens": 27957,
+        "completion_tokens": 34771,
+        "total_tokens": 62728
+      },
+      "super": {
+        "calls": 3,
+        "prompt_tokens": 7843,
+        "completion_tokens": 12943,
+        "total_tokens": 20786
+      },
+      "ultra": {
+        "calls": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    "models": {
+      "nano": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "super": "nvidia/nemotron-3-super-120b-a12b",
+      "ultra": "nvidia/Nemotron-3-Ultra-550b-a55b"
+    },
+    "total_tokens": 83514,
+    "budget": 1500000
+  },
+  "error": ""
+}

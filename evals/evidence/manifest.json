@@ -1,9 +1,24 @@
 {
-  "demo": "sandboxes-broken-invoice.json",
+  "demo": "demo-broken-invoice.json",
   "runs": [
     {
-      "file": "sandboxes-broken-invoice.json",
-      "title": "First search on real Nebius Sandboxes: broken-invoice, solved at depth 3",
+      "file": "demo-broken-invoice.json",
+      "title": "broken-invoice on Nebius Sandboxes: rival patches from one checkpoint, two regressions abandoned, green at depth 2",
+      "recorded_at": 1789992159
+    },
+    {
+      "file": "demo-broken-invoice-alt-1.json",
+      "title": "broken-invoice on Nebius Sandboxes, second recording: three patches refused before execution, green at depth 3",
+      "recorded_at": 1789992641
+    },
+    {
+      "file": "demo-broken-invoice-alt-2.json",
+      "title": "broken-invoice on Nebius Sandboxes, third recording: green at depth 1",
+      "recorded_at": 1789992271
+    },
+    {
+      "file": "sandboxes-first-run.json",
+      "title": "The first search ever executed on real Nebius Sandboxes",
       "recorded_at": 1789982918
     }
   ]

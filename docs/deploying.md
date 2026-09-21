@@ -11,6 +11,33 @@ needs, but it is worth knowing before exposing the service publicly.
 Either way the service is small and stateless apart from one volume of recorded
 runs.
 
+## The public demo: GitHub Pages
+
+The URL on the submission is a **static build** of the interface, published by
+[`.github/workflows/pages.yml`](../.github/workflows/pages.yml) on every push to
+`main`. It has no server behind it: it replays runs checked into
+[`evals/evidence/`](../evals/evidence/), labels them as recordings, and disables
+Run with the reason. That is deliberate:
+
+- **It cannot spend anything.** No key exists to leak or to be run up.
+- **It cannot go down with the credits.** A hosted service stops when its
+  account runs dry; a static page lasts as long as the repository.
+- **Everything is inspectable.** Every node, patch and test outcome of a real
+  search, the same file the README cites.
+
+Build it locally the same way:
+
+```bash
+cd web
+NEXT_PUBLIC_STATIC_DEMO=1 NEXT_PUBLIC_BASE_PATH=/Nebius-Nvidia npm run build:static
+```
+
+`evals/evidence/manifest.json` decides what ships: the `demo` entry is what the
+page opens on, and every entry is reachable at `?run=<run_id>` — which is how
+the README links straight to the tree behind a claim.
+
+Live searches need a key and a server; the rest of this page covers that.
+
 ## What a visitor should see
 
 Someone who opens the URL has no API key and no repository to point at. An empty
@@ -39,7 +66,8 @@ ARBORIST_DEMO_RUN=/data/runs/run-xxxxxxxx.json
 
 With no `ARBORIST_DEMO_RUN`, the server picks the best saved report it can find —
 preferring one that went green and has the largest tree, since the newest file is
-often a one-node experiment.
+often a one-node experiment. With nothing saved at all, as in a fresh clone, it
+falls back to the demo shipped in `evals/evidence/`.
 
 ## Docker
 

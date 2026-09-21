@@ -84,11 +84,21 @@ The patch is applied to the parent's in-memory files first. It is rejected if:
 - the `search` block does not appear in the file,
 - it appears **more than once** (ambiguous),
 - the file does not exist,
-- the patch changes nothing.
+- it edits a **protected** file (`--protect`, typically the tests: the oracle
+  must not be rewritten to agree with the code),
+- it leaves a Python file that no longer parses,
+- the patch changes nothing — including a rewrite that only restyles code.
 
-A rejected patch becomes a node with status `invalid`, and **never reaches the
-sandbox**. It cost tokens, not wall-clock, and the tree keeps it so the report
-shows what was attempted.
+A whole-file rewrite is **minimised** first: every changed region is reverted
+to the original if the file still parses to the same syntax tree and keeps the
+same comments without it. Models restyle files they resend — quote swaps,
+moved blank lines — and none of that belongs in a diff someone has to review.
+
+A rejected patch gets **one** repair attempt, with the rejection reason fed back
+to the model; only if that fails too does it become a node with status `invalid`.
+
+An invalid node **never reaches the sandbox**. It cost tokens, not wall-clock,
+and the tree keeps it so the report shows what was attempted.
 
 One concession: if a `search` block matches on stripped lines and that match is
 unique, the real offsets are recovered (`_relaxed_find`). Models occasionally

@@ -141,9 +141,17 @@ directory snapshots.
 | `NEBIUS_PROJECT_ID` | — | **Required.** Sent as the `Project` header on every request. Missing, it surfaces as a `400 Missing "Project" header` or, through the SDK, a 403 indistinguishable from missing Beta access |
 | `ARBORIST_BACKEND` | `contree` | `contree` or `local` |
 
-The OCI image comes from `--image` (default `python:3.12-slim`). Any registry
-ConTree can import from works; using the image your CI already builds makes the
-sandbox match production.
+The OCI image comes from `--image` (default `python:3.12-slim`). `base()` calls
+`images.oci()`, which resolves the reference in the project and imports it from
+its registry when it is missing, so any public image works on first use; using
+the image your CI already builds makes the sandbox match production. (An
+earlier version called `images.use()`, which only resolves images already
+imported — every other image failed at the first run.)
+
+`--workdir` (`ARBORIST_WORKDIR`, default `/workspace`) is where the repository is
+written and every command runs. Images that ship a project already installed —
+SWE-bench's put it at `/testbed` — need the patch written over that copy rather
+than beside it; [`evals/swebench`](../evals/swebench/README.md) runs that way.
 
 ## LocalBackend
 

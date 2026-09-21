@@ -115,7 +115,8 @@ branch exists leaves the commit in place rather than unwinding it silently.
 | `ARBORIST_MAX_DEPTH` | `4` | Tree depth cap |
 | `ARBORIST_TOKEN_BUDGET` | `1500000` | Total tokens across all tiers |
 | `ARBORIST_RUNS_DIR` | `runs` | Where reports are written and replayed from |
-| `ARBORIST_DEMO_RUN` | — | A specific report to show on page load |
+| `ARBORIST_DEMO_RUN` | — | A specific report to show on page load. Without it, the best report in `ARBORIST_RUNS_DIR`, then the demo shipped in `evals/evidence/` |
+| `ARBORIST_WORKDIR` | `/workspace` | Where the repository lives inside the sandbox. `/testbed` for SWE-bench images, which ship the project installed there |
 
 ## Adding an execution backend
 

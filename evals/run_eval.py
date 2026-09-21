@@ -147,7 +147,9 @@ def run_case(
     # Keep the tree. A table says which mode did better; only the tree says why
     # -- and "the linear agent ran out of frontier" is not visible in a number.
     if reports_dir is not None:
-        mode = f"{model_set}-{'branching' if branching else 'linear'}-{repetition}"
+        # The backend is part of the name: a Sandboxes sweep used to overwrite
+        # the local sweep's trees, which share every other part of it.
+        mode = f"{backend_name}-{model_set}-{'branching' if branching else 'linear'}-{repetition}"
         path = write_report(result, reports_dir)
         path.rename(path.with_name(f"{name}-{mode}.json"))
         patch = path.with_suffix(".patch")

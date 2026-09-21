@@ -46,6 +46,10 @@ class PublishPlan:
     patch: str
     commit_message: str
     files: list[str] = field(default_factory=list)
+    directory: str = ""
+    """Where the repaired project sits inside the git repository, when it is not
+    the root -- a package in a monorepo, say. The run's diff is relative to the
+    project, so it is applied with ``git apply --directory``."""
 
     def describe(self) -> str:
         """The commands this plan would run, for a dry run."""
@@ -53,7 +57,7 @@ class PublishPlan:
             [
                 f"cd {self.repo_path}",
                 f"git checkout -b {self.branch} {self.base}",
-                "git apply <patch>",
+                f"git apply --directory={self.directory} <patch>" if self.directory else "git apply <patch>",
                 f"git add {' '.join(self.files) if self.files else '-A'}",
                 "git commit -F <message>",
                 f"git push -u origin {self.branch}",
@@ -94,9 +98,12 @@ def build_plan(
     base: str | None = None,
 ) -> PublishPlan:
     """Assemble everything needed to open the pull request, without doing it."""
-    repo = Path(repo_path).resolve()
-    if not (repo / ".git").exists():
-        raise GitError(f"{repo} is not a git repository")
+    project = Path(repo_path).resolve()
+    top = _git(project, "rev-parse", "--show-toplevel", check=False) if project.is_dir() else ""
+    if not top:
+        raise GitError(f"{project} is not inside a git repository")
+    repo = Path(top).resolve()
+    directory = project.relative_to(repo).as_posix() if project != repo else ""
 
     patch = report.get("diff") or ""
     if not patch.strip():
@@ -104,7 +111,7 @@ def build_plan(
 
     title = pr_title(report)
     body = render_pr_body(report)
-    files = patched_files(patch)
+    files = [f"{directory}/{f}" if directory else f for f in patched_files(patch)]
     run_id = report.get("run_id", "run")
     branch = branch or f"arborist/{slugify(title.split(':', 1)[-1])}-{run_id.split('-')[-1]}"
     base = base or current_branch(repo)
@@ -128,6 +135,7 @@ def build_plan(
         patch=patch,
         commit_message=message,
         files=files,
+        directory=directory,
     )
 
 
@@ -140,6 +148,8 @@ def apply_patch(plan: PublishPlan, *, check_only: bool = False) -> None:
     args = ["apply", "--3way"]
     if check_only:
         args = ["apply", "--check"]
+    if plan.directory:
+        args.append(f"--directory={plan.directory}")
     proc = subprocess.run(
         ["git", *args, "-"],
         cwd=plan.repo_path,

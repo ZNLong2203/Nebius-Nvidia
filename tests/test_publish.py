@@ -60,8 +60,51 @@ def test_build_plan_accepts_explicit_branch_and_base(multi_branch_report, demo_g
 
 
 def test_build_plan_refuses_a_non_repository(multi_branch_report, tmp_path):
-    with pytest.raises(GitError, match="not a git repository"):
+    with pytest.raises(GitError, match="not inside a git repository"):
         build_plan(multi_branch_report, tmp_path)
+
+
+@pytest.fixture
+def monorepo(demo_git_repo, tmp_path) -> Path:
+    """The same broken project, one package among others in a larger repository."""
+    import shutil
+
+    root = tmp_path / "mono"
+    (root / "packages").mkdir(parents=True)
+    shutil.copytree(demo_git_repo, root / "packages" / "invoice", ignore=shutil.ignore_patterns(".git"))
+    (root / "README.md").write_text("several packages\n")
+    for args in (
+        ("init", "-b", "main"),
+        ("config", "user.email", "test@example.com"),
+        ("config", "user.name", "Test"),
+        ("add", "-A"),
+        ("commit", "-m", "initial"),
+    ):
+        _git(root, *args)
+    return root
+
+
+def test_a_project_inside_a_larger_repository_can_be_published(multi_branch_report, monorepo):
+    """The run's diff is relative to the project, not to the repository root."""
+    project = monorepo / "packages" / "invoice"
+    plan = build_plan(multi_branch_report, project)
+
+    assert plan.repo_path == monorepo.resolve()
+    assert plan.directory == "packages/invoice"
+    assert all(f.startswith("packages/invoice/") for f in plan.files)
+    assert "--directory=packages/invoice" in plan.describe()
+
+    result = publish(plan)
+    assert result.committed
+    changed = _git(monorepo, "show", "--name-only", "--pretty=format:", "HEAD").split()
+    assert changed and all(f.startswith("packages/invoice/src/") for f in changed)
+
+    import sys
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q"], cwd=project, capture_output=True, text=True
+    )
+    assert proc.returncode == 0, proc.stdout
 
 
 def test_build_plan_refuses_a_run_that_changed_nothing(multi_branch_report, demo_git_repo):

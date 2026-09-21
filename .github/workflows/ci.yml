@@ -3,7 +3,11 @@ name: CI
 on:
   push:
     branches: [main]
+  # Only pull requests into main. The showcase pull request Arborist opened on
+  # this repository targets a demo/ branch and repairs examples/broken-invoice,
+  # which the fixture check below would rightly flag -- the fix is the point.
   pull_request:
+    branches: [main]
 
 jobs:
   test:

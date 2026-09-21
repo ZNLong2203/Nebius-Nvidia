@@ -590,6 +590,8 @@ def run(args) -> int:
     # The run uses the exact command validation proved: the same test selection.
     valid = {v["instance_id"]: v["command"] for v in json.loads(validation.read_text()) if v["valid"]}
     rows_in = [r for r in instances(args.instances) if r["instance_id"] in valid]
+    if args.shard:
+        rows_in = shard(rows_in, args.shard)
     modes = {"on": [True], "off": [False]}.get(args.only, [True, False])
 
     out = Path(args.out)
@@ -637,6 +639,32 @@ def run(args) -> int:
     return 0
 
 
+def shard(rows: list[dict], spec: str) -> list[dict]:
+    """``K/N``: the K-th of N contiguous slices, so a long sweep can be split
+    across machines that each have a time limit -- CI jobs stop at six hours."""
+    k, n = (int(x) for x in spec.split("/"))
+    if not 1 <= k <= n:
+        raise SystemExit(f"--shard {spec}: K must be between 1 and N")
+    size, extra = divmod(len(rows), n)
+    start = (k - 1) * size + min(k - 1, extra)
+    return rows[start : start + size + (1 if k <= extra else 0)]
+
+
+def merge(args) -> int:
+    """Combine the results files of several shards into one table."""
+    rows: list[Row] = []
+    for path in args.parts:
+        rows += load_rows(Path(path))
+    seen = {(r.instance_id, r.branching, r.run) for r in rows}
+    if len(seen) != len(rows):
+        print("the same run appears in more than one part", file=sys.stderr)
+        return 2
+    rows.sort(key=lambda r: (r.instance_id, not r.branching, r.run))
+    write(rows, Path(args.out))
+    print(markdown(rows))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="phase", required=True)
@@ -655,12 +683,17 @@ def main() -> int:
     r.add_argument("--resume", action="store_true")
     r.add_argument("--reports", action="store_true", help="save every run's full tree")
     r.add_argument("--run-limit", type=float, default=60, help="minutes before a stuck run is abandoned")
+    r.add_argument("--shard", help="K/N: run only the K-th of N contiguous slices of the instances")
+
+    m = sub.add_parser("merge", help="combine shard results into one table")
+    m.add_argument("parts", nargs="+", help="results .json files written by `run`")
+    m.add_argument("--out", default=str(HERE / "results.md"))
 
     args = parser.parse_args()
     faulthandler.enable()
     if hasattr(signal, "SIGUSR1"):
         faulthandler.register(signal.SIGUSR1, all_threads=True)
-    return validate(args) if args.phase == "validate" else run(args)
+    return {"validate": validate, "run": run, "merge": merge}[args.phase](args)
 
 
 if __name__ == "__main__":

@@ -28,6 +28,7 @@ import tempfile
 import time
 import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -114,8 +115,17 @@ class ContreeBackend:
 
         # The shorthand `ContreeSync(token=..., base_url=...)` leaves project_id
         # at its default, so the auth object has to be built in full.
+        #
+        # The warning threshold is zeroed because the SDK's default (24h) is
+        # meant for long-lived tokens, while `whoami` reports a rolling session
+        # that always ends five minutes from now. Left alone, every run opens
+        # with "Token expires in 0 hours" -- which is never true: a client held
+        # well past that mark keeps working.
         self._sdk = ContreeSync(
-            ContreeConfig(auth=IAMAuth(token=token, project_id=project_id, base_url=base_url))
+            ContreeConfig(
+                auth=IAMAuth(token=token, project_id=project_id, base_url=base_url),
+                token_expiration_warning_threshold=timedelta(0),
+            )
         )
         self._timeout = timeout
         self._forks = 0

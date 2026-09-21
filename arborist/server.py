@@ -38,6 +38,31 @@ def _runs_dir() -> Path:
     return Path(load_settings().runs_dir)
 
 
+# Curated, checked-in runs: what the README cites and the static build replays.
+EVIDENCE_DIR = Path(__file__).resolve().parents[1] / "evals" / "evidence"
+
+
+def _evidence_demo() -> dict | None:
+    """The run the repository ships as its demo, for when nothing is on disk.
+
+    runs/ is not checked in, so a fresh clone opened on an empty page until
+    someone recorded a run. The shipped demo is the same file the static build
+    opens on, labelled with when it was really recorded.
+    """
+    try:
+        manifest = json.loads((EVIDENCE_DIR / "manifest.json").read_text(encoding="utf-8"))
+        entry = next(e for e in manifest["runs"] if e["file"] == manifest["demo"])
+        path = EVIDENCE_DIR / entry["file"]
+        return {
+            "available": True,
+            "source": path.name,
+            "recorded_at": entry.get("recorded_at"),
+            "run": load_report(path),
+        }
+    except (OSError, ValueError, KeyError, TypeError, StopIteration):
+        return None
+
+
 def _saved_reports() -> list[Path]:
     """Finished run reports on disk, newest first."""
     directory = _runs_dir()
@@ -278,7 +303,7 @@ def demo_run() -> dict:
             }
         except (OSError, ValueError):
             continue
-    return {"available": False, "source": "", "recorded_at": None, "run": None}
+    return _evidence_demo() or {"available": False, "source": "", "recorded_at": None, "run": None}
 
 
 @app.get("/api/health")

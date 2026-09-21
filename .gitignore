@@ -21,3 +21,8 @@ web/out/
 web/.next/
 web/next-env.d.ts
 evals/reports/
+
+# SWE-bench harness: repository mirrors, checkouts and per-run trees
+evals/swebench/.cache/
+evals/swebench/reports/
+web/public/demo/

@@ -1,0 +1,58 @@
+name: Pages
+
+# The public demo: the interface built as static files, replaying runs that are
+# checked into evals/evidence/. There is no server and no key behind it, so it
+# costs nothing, cannot spend anyone's credits, and stays up for as long as the
+# repository does -- which is what a demo URL judged months later needs.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Pinned exactly, for the same reasons as ci.yml.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: "22"
+
+      - name: Build the static interface
+        working-directory: web
+        env:
+          NEXT_PUBLIC_STATIC_DEMO: "1"
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          NEXT_PUBLIC_REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          npm install --no-audit --no-fund
+          npm run build:static
+          # Jekyll would otherwise drop every path starting with an underscore,
+          # _next/ included -- which is all of the JavaScript.
+          touch out/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: web/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5.0.1

@@ -149,8 +149,41 @@ def test_demo_honours_an_explicit_report(client, runs_dir, monkeypatch, multi_br
 
 def test_demo_is_empty_when_nothing_has_been_recorded(client, tmp_path, monkeypatch):
     monkeypatch.setenv("ARBORIST_RUNS_DIR", str(tmp_path / "nothing-here"))
+    monkeypatch.setattr(server, "EVIDENCE_DIR", tmp_path / "no-evidence-either")
     body = client.get("/api/demo").json()
     assert body == {"available": False, "source": "", "recorded_at": None, "run": None}
+
+
+def test_a_fresh_clone_opens_on_the_shipped_demo(client, tmp_path, monkeypatch, multi_branch_report):
+    """runs/ is not checked in; evals/evidence/ is, and fills the gap."""
+    import json
+
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "shipped.json").write_text(json.dumps(multi_branch_report))
+    (evidence / "manifest.json").write_text(
+        json.dumps({"demo": "shipped.json", "runs": [{"file": "shipped.json", "recorded_at": 1790000000}]})
+    )
+    monkeypatch.setenv("ARBORIST_RUNS_DIR", str(tmp_path / "empty"))
+    monkeypatch.setattr(server, "EVIDENCE_DIR", evidence)
+
+    body = client.get("/api/demo").json()
+    assert body["available"] is True
+    assert body["source"] == "shipped.json"
+    assert body["recorded_at"] == 1790000000, "the recording time, not the checkout time"
+    assert body["run"]["run_id"] == multi_branch_report["run_id"]
+
+
+def test_a_saved_run_still_wins_over_the_shipped_demo(client, runs_dir, tmp_path, monkeypatch, multi_branch_report):
+    import json
+
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    (evidence / "shipped.json").write_text(json.dumps({**multi_branch_report, "run_id": "shipped"}))
+    (evidence / "manifest.json").write_text(json.dumps({"demo": "shipped.json", "runs": [{"file": "shipped.json"}]}))
+    monkeypatch.setattr(server, "EVIDENCE_DIR", evidence)
+
+    assert client.get("/api/demo").json()["run"]["run_id"] == multi_branch_report["run_id"]
 
 
 def test_demo_skips_a_corrupt_report(client, runs_dir):

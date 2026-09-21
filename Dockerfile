@@ -31,6 +31,8 @@ RUN pip install --no-cache-dir -e ".[contree]"
 
 COPY ui ./ui
 COPY examples ./examples
+# The shipped demo run: what the page opens on before anything is recorded.
+COPY evals/evidence ./evals/evidence
 COPY --from=web /web/out ./web/out
 
 # Recorded runs live on a volume so the demo survives a redeploy.

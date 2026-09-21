@@ -1,0 +1,10 @@
+{
+  "demo": "sandboxes-broken-invoice.json",
+  "runs": [
+    {
+      "file": "sandboxes-broken-invoice.json",
+      "title": "First search on real Nebius Sandboxes: broken-invoice, solved at depth 3",
+      "recorded_at": 1789982918
+    }
+  ]
+}

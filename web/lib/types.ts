@@ -107,6 +107,8 @@ export interface Health {
   backend: string;
   models: Record<string, string>;
   saved_runs: number;
+  /** A static build with no server: recorded runs only. */
+  static?: boolean;
 }
 
 export interface DemoResponse {

@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
-    "lint": "next lint"
+    "lint": "next lint",
+    "build:static": "node scripts/bundle-demo.mjs && next build"
   },
   "dependencies": {
     "next": "15.5.4",

@@ -122,7 +122,13 @@ export function CommandBar({
             <button
               type="button"
               disabled={!canRun}
-              title={canRun ? undefined : "This server has no NEBIUS_API_KEY configured"}
+              title={
+                canRun
+                  ? undefined
+                  : health?.static
+                    ? "This page is a static recording. Clone the repository to run a live search."
+                    : "This server has no NEBIUS_API_KEY configured"
+              }
               onClick={() =>
                 onRun({
                   repo_path: repo.trim(),

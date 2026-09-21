@@ -1,5 +1,6 @@
 "use client";
 
+import { REPO_URL } from "@/lib/api";
 import type { Health, RunResult } from "@/lib/types";
 import { Badge } from "./Primitives";
 
@@ -92,9 +93,19 @@ export function ContextStrip({
             ? ` on Nebius Sandboxes, ${result.stats.forks ?? result.stats.sandbox_executions} forked executions`
             : " on the local backend"}
           {recorded.at ? `, ${new Date(recorded.at * 1000).toLocaleString()}` : ""}.
-          {health?.can_run
-            ? " Press Run search to start a live one."
-            : " Live runs are disabled on this server."}
+          {health?.static ? (
+            <>
+              {" This page is a static recording — "}
+              <a className="underline underline-offset-2 hover:text-ink" href={REPO_URL}>
+                clone the repository
+              </a>
+              {" to run a live search."}
+            </>
+          ) : health?.can_run ? (
+            " Press Run search to start a live one."
+          ) : (
+            " Live runs are disabled on this server."
+          )}
         </span>
       )}
 

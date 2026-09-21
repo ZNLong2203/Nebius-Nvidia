@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   // one process, one URL, no CORS, and nothing to deploy separately.
   output: "export",
   distDir: "out",
+  // Set only for a build hosted under a sub-path, such as GitHub Pages
+  // (/Nebius-Nvidia). The FastAPI-served build lives at the root.
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || undefined,
   images: { unoptimized: true },
   // Development only: `next dev` proxies the API so the UI can be iterated on
   // with hot reload. The export is served by FastAPI itself, which already has

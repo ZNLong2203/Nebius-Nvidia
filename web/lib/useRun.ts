@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { cancelRun, getDemo, getHealth, getRun, startRun, streamRun } from "./api";
+import { cancelRun, getDemo, getHealth, getRun, startRun, STATIC_DEMO, streamRun } from "./api";
 import type { Health, RunEvent, RunResult, SearchNode, StartRunRequest } from "./types";
 
 export interface Activity {
@@ -169,8 +169,12 @@ export function useRun() {
           error: existing.error || null,
           nodes: existing.result?.nodes ?? [],
           result: existing.result,
+          // A shipped run is a recording just as much as the default demo is.
+          recorded: STATIC_DEMO ? { source: requested, at: existing.recorded_at ?? null } : prev.recorded,
         }));
-        attach(requested);
+        // A static page has no event stream to attach to, and needs none: the
+        // run it loaded is finished.
+        if (!STATIC_DEMO) attach(requested);
         return;
       }
 

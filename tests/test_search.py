@@ -597,3 +597,49 @@ def test_by_default_the_whole_repository_is_seeded(tmp_path):
     settings = load_settings(backend="local", fanout=1, max_nodes=1, max_depth=1)
     Arborist(settings, backend, llm).run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
     assert "src/billing/money.py" in backend.seeded and "tests/test_billing.py" in backend.seeded
+
+
+def test_a_linear_run_spends_its_whole_budget_when_attempts_keep_regressing(backend):
+    """Per state, the linear arm gets as many candidates as the branching arm.
+
+    The cap used to count expansions. A linear run proposes one candidate per
+    expansion, so a state was abandoned after three attempts instead of nine,
+    and a run whose attempts kept regressing stopped with budget left -- the
+    fifth bias of this kind the evals turned up.
+    """
+    good = {
+        "explanation": "the real rounding fix",
+        "edits": [{"path": "src/billing/money.py", "new_content": MONEY_FIXED}],
+    }
+    regresses = {
+        "explanation": "a theory that breaks pct",
+        "edits": [
+            {
+                "path": "src/billing/money.py",
+                "search": "    return value * (percent / 100.0)",
+                "replace": "    return value * percent",
+            }
+        ],
+    }
+    llm = ScriptedLLM(
+        responses={
+            # Distinct theories: the search rightly drops one already tried. After
+            # two expansions without progress diagnosis escalates to Ultra.
+            "super": [_diagnosis(f"theory {i}", "src/billing/money.py") for i in range(30)],
+            "ultra": [_diagnosis(f"deeper theory {i}", "src/billing/money.py") for i in range(30)],
+            "nano": [good] + [regresses] * 30,
+        }
+    )
+    settings = load_settings(backend="local", fanout=1, max_nodes=8, max_depth=8, branching=False)
+    result = Arborist(settings, backend, llm).run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
+
+    assert len(result.nodes) - 1 == 8, "the run must use its whole node budget"
+
+
+def test_the_expansion_cap_is_a_share_of_the_candidate_cap(backend):
+    from arborist.search import MAX_CANDIDATES_PER_NODE
+
+    for fanout, expansions in ((1, 9), (3, 3), (4, 3)):
+        agent = Arborist(load_settings(backend="local", fanout=fanout), backend, ScriptedLLM(responses={}))
+        assert agent._expansion_cap == expansions
+        assert agent._expansion_cap * fanout >= MAX_CANDIDATES_PER_NODE

@@ -24,6 +24,7 @@ That turns two things a linear agent cannot do into ordinary operations:
 from __future__ import annotations
 
 import json
+import math
 import threading
 import time
 from collections.abc import Callable
@@ -56,7 +57,13 @@ from .tools.tavily import TavilyClient
 # its own state.
 JUNIT_PATH = ".arborist/report.xml"
 REGRESSION_WEIGHT = 0.6
-MAX_EXPANSIONS_PER_NODE = 3
+# How many candidate patches one state gets before it is abandoned. Counted in
+# candidates, not expansions: an expansion proposes `fanout` of them, so a cap
+# of three expansions gave a linear run (fanout 1) three attempts per state
+# against a branching run's nine (fanout 3) -- and once every state had used
+# its three rounds, the linear run stopped with budget unspent. Per state the
+# arms are now even; at fanout 3 and 4 the cap is three expansions, as before.
+MAX_CANDIDATES_PER_NODE = 9
 TIE_EPSILON = 1e-6
 STALL_LIMIT = 2
 
@@ -335,7 +342,7 @@ class Arborist:
                 # that yielded nothing valid is the same case and the more
                 # urgent one: evicting there ended runs after a single bad
                 # patch with most of the budget unspent.
-                if parent_state.node.expansions >= MAX_EXPANSIONS_PER_NODE:
+                if parent_state.node.expansions >= self._expansion_cap:
                     frontier = [nid for nid in frontier if nid != candidate_id]
                 self._stalls = 0 if improved else self._stalls + 1
                 self._emit("progress", best_score=self._states[best_id].node.score, stalls=self._stalls)
@@ -362,6 +369,11 @@ class Arborist:
         return self._finish(run_id, cfg, winner_node, sources, started, error=error)
 
     # -- selection ----------------------------------------------------------
+    @property
+    def _expansion_cap(self) -> int:
+        """Expansions a state gets: its share of MAX_CANDIDATES_PER_NODE."""
+        return max(1, math.ceil(MAX_CANDIDATES_PER_NODE / max(1, self.settings.fanout)))
+
     def _select(self, frontier: list[str]) -> str | None:
         """Best-first with a shallow-depth tiebreak.
 
@@ -386,7 +398,7 @@ class Arborist:
         if fresh:
             return max(fresh, key=lambda n: (n.score, -n.depth)).id
 
-        revisitable = [n for n in candidates if n.expansions < MAX_EXPANSIONS_PER_NODE]
+        revisitable = [n for n in candidates if n.expansions < self._expansion_cap]
         if not revisitable:
             return None
         return max(revisitable, key=lambda n: (n.score, -n.expansions, -n.depth)).id

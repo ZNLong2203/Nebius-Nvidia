@@ -5,7 +5,9 @@ from __future__ import annotations
 import ast
 import difflib
 import fnmatch
+import io
 import re
+import tokenize
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -139,7 +141,10 @@ def apply_edits(
 
         if edit.is_rewrite:
             _refuse_protected(path, protected)
-            updated[path] = edit.new_content or ""
+            content = edit.new_content or ""
+            if path in updated:
+                content = minimise_rewrite(path, updated[path], content)
+            updated[path] = content
             continue
 
         if edit.search is None or edit.replace is None:
@@ -165,10 +170,53 @@ def apply_edits(
         updated[path] = body.replace(edit.search, edit.replace, 1)
 
     if updated == files:
-        raise PatchError("patch is a no-op")
+        raise PatchError("patch is a no-op (changes that only reformat code are dropped)")
 
     _reject_broken_syntax(files, updated)
     return updated
+
+
+def minimise_rewrite(path: str, before: str, after: str) -> str:
+    """Undo the parts of a whole-file rewrite that change nothing but formatting.
+
+    A model sending a whole file restyles it on the way through -- triple quotes
+    swapped to dodge JSON escaping, blank lines moved -- and every one of those
+    lands in the diff a reviewer has to read. Each changed region is put back
+    to the original if, and only if, the file still parses to the same syntax
+    tree and keeps the same comments with it reverted. What remains is exactly
+    the part of the rewrite that means something.
+    """
+    if not path.endswith(".py") or before == after:
+        return after
+    try:
+        target = _fingerprint(after)
+    except (SyntaxError, ValueError, tokenize.TokenError):
+        return after  # the syntax gate will say why
+
+    old = before.splitlines(keepends=True)
+    current = after.splitlines(keepends=True)
+    opcodes = difflib.SequenceMatcher(a=old, b=current, autojunk=False).get_opcodes()
+    # From the end, so reverting one region never shifts the ones before it.
+    for tag, i1, i2, j1, j2 in reversed(opcodes):
+        if tag == "equal":
+            continue
+        candidate = current[:j1] + old[i1:i2] + current[j2:]
+        try:
+            if _fingerprint("".join(candidate)) == target:
+                current = candidate
+        except (SyntaxError, ValueError, tokenize.TokenError):
+            continue
+    return "".join(current)
+
+
+def _fingerprint(source: str) -> tuple[str, tuple[str, ...]]:
+    """What Python sees (the tree, positions ignored) plus what a reader sees and it does not."""
+    comments = tuple(
+        token.string
+        for token in tokenize.generate_tokens(io.StringIO(source).readline)
+        if token.type == tokenize.COMMENT
+    )
+    return ast.dump(ast.parse(source)), comments
 
 
 def _normalise_path(raw: str) -> str:

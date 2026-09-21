@@ -279,3 +279,71 @@ def test_a_leading_dot_slash_is_still_removed():
     out = apply_edits(files, [Edit(path="./src/app.py", search="a - b", replace="a + b")])
     assert "a + b" in out["src/app.py"]
 
+
+
+# --------------------------------------------------------------------------- #
+# minimising whole-file rewrites
+# --------------------------------------------------------------------------- #
+
+INVOICE = '''"""Invoice totals."""
+
+from .money import pct
+
+
+def total(subtotal, tax_pct, coupon):
+    """Total payable for an invoice."""
+    # tax applies after the coupon
+    taxed = subtotal + pct(subtotal, tax_pct)
+    return taxed - coupon
+'''
+
+
+def _changed_lines(before: str, after: str) -> list[str]:
+    import difflib
+
+    return [
+        line
+        for line in difflib.unified_diff(before.splitlines(), after.splitlines(), lineterm="")
+        if line[:1] in "+-" and not line.startswith(("+++", "---"))
+    ]
+
+
+def test_a_rewrite_keeps_its_fix_and_drops_its_restyling():
+    """Swapped triple quotes and a dropped blank line change nothing Python sees."""
+    rewrite = INVOICE.replace('"""', "'''").replace('\n\nfrom', "\nfrom").replace(
+        "    taxed = subtotal + pct(subtotal, tax_pct)\n    return taxed - coupon\n",
+        "    base = max(subtotal - coupon, 0)\n    return base + pct(base, tax_pct)\n",
+    )
+    out = apply_edits({"src/invoice.py": INVOICE}, [Edit(path="src/invoice.py", new_content=rewrite)])
+    assert _changed_lines(INVOICE, out["src/invoice.py"]) == [
+        "-    taxed = subtotal + pct(subtotal, tax_pct)",
+        "-    return taxed - coupon",
+        "+    base = max(subtotal - coupon, 0)",
+        "+    return base + pct(base, tax_pct)",
+    ]
+
+
+def test_a_changed_comment_is_kept():
+    """Comments are not in the syntax tree, so they are compared separately."""
+    rewrite = INVOICE.replace("# tax applies after the coupon", "# the coupon comes off before tax")
+    out = apply_edits({"src/invoice.py": INVOICE}, [Edit(path="src/invoice.py", new_content=rewrite)])
+    assert "# the coupon comes off before tax" in out["src/invoice.py"]
+
+
+def test_a_changed_docstring_is_kept():
+    rewrite = INVOICE.replace("Total payable for an invoice.", "Total payable, coupon first.")
+    out = apply_edits({"src/invoice.py": INVOICE}, [Edit(path="src/invoice.py", new_content=rewrite)])
+    assert "Total payable, coupon first." in out["src/invoice.py"]
+
+
+def test_a_rewrite_that_only_restyles_is_a_no_op():
+    rewrite = INVOICE.replace('"""', "'''")
+    with pytest.raises(PatchError, match="no-op"):
+        apply_edits({"src/invoice.py": INVOICE}, [Edit(path="src/invoice.py", new_content=rewrite)])
+
+
+def test_only_python_is_minimised():
+    before = "a: 1\nb: 2\n"
+    after = "a: 1\n\nb: 2\n"
+    out = apply_edits({"conf.yaml": before}, [Edit(path="conf.yaml", new_content=after)])
+    assert out["conf.yaml"] == after

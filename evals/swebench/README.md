@@ -33,11 +33,16 @@ SWE-bench scores an instance on the tests it lists — FAIL_TO_PASS and
 PASS_TO_PASS — and ignores the rest of the file, usually because those tests
 fail in its environment too (`requests-1963` has one written for an
 older pytest). Arborist's own objective is a fully green command, so the
-command deselects every unlisted test: "green" then means exactly
-"resolved", and the agent is never asked to repair what the benchmark
-ignores. Ids are mapped between SWE-bench's node ids and the names pytest
-writes into JUnit, with prefix matching for ids the dataset cut short at a
-space inside a parameter.
+command runs **exactly the listed tests**, by node id: "green" then means
+exactly "resolved", and the agent is never asked to repair what the
+benchmark ignores.
+
+The ids are read from a run with the reference fix applied, where every test
+collects, rather than from the dataset — which truncates some parametrised ids
+at the first space. Selecting rather than deselecting matters: pytest matches
+`--deselect` as a *prefix*, and a first version that deselected unlisted tests
+silently dropped `flask-4045`'s own FAIL_TO_PASS test along with a shorter-named
+neighbour.
 
 ### Validation — before any model is called
 

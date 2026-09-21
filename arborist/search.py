@@ -68,6 +68,11 @@ class RunConfig:
     image: str = "python:3.12-slim"
     context_files: list[str] = field(default_factory=list)
     goal: str = ""
+    """What the repair is for, in words -- an issue report, say. Shown to every
+    model call; the failing tests remain the only judge of success."""
+    protected: list[str] = field(default_factory=list)
+    """Glob patterns no patch may edit. Protecting the tests makes "green" mean
+    the code was fixed rather than the oracle rewritten."""
 
     @property
     def instrumented_test_command(self) -> str:
@@ -402,6 +407,7 @@ class Arborist:
             tavily=self.tavily,
             parent_attempts=parent.tried,
             fanout=self.settings.fanout,
+            goal=cfg.goal,
         )
         self._emit(
             "diagnosed",
@@ -482,6 +488,7 @@ class Arborist:
                 stderr=parent.stderr,
                 sources=context,
                 evidence=meta.get("evidence", ""),
+                goal=cfg.goal,
             )
         except (BudgetExceeded, Cancelled):
             raise
@@ -503,7 +510,7 @@ class Arborist:
         # source, forms the same theory, and quotes the same snippet that did
         # not match. Three of five patches were lost that way before this.
         try:
-            patched = apply_edits(parent.files, edits)
+            patched = apply_edits(parent.files, edits, protected=cfg.protected)
         except PatchError as first_error:
             try:
                 self._check_cancelled()
@@ -519,10 +526,11 @@ class Arborist:
                     sources=context,
                     evidence=meta.get("evidence", ""),
                     retry_note=str(first_error),
+                    goal=cfg.goal,
                 )
                 node.edits = edits
                 node.explanation = explanation
-                patched = apply_edits(parent.files, edits)
+                patched = apply_edits(parent.files, edits, protected=cfg.protected)
                 node.note = f"applied on retry after: {first_error}"
             except (BudgetExceeded, Cancelled):
                 raise

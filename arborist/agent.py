@@ -127,6 +127,16 @@ Reply with JSON only:
 {"winner": "<node id>", "reason": "...", "suspicious": ["<node id>", ...]}"""
 
 
+def _task_block(goal: str, limit: int) -> str:
+    """The stated purpose of the repair, when there is one, ahead of everything."""
+    goal = (goal or "").strip()
+    if not goal:
+        return ""
+    if len(goal) > limit:
+        goal = goal[:limit] + " [...]"
+    return f"TASK -- what this repair is for\n{goal}\n\n"
+
+
 def _failure_digest(report: TestReport | None, stdout: str, stderr: str, limit: int = 6000) -> str:
     head = ""
     if report:
@@ -153,6 +163,7 @@ def diagnose(
     tavily: TavilyClient | None = None,
     parent_attempts: list[str] | None = None,
     fanout: int = 4,
+    goal: str = "",
 ) -> tuple[list[Hypothesis], dict]:
     """Ask a model why the suite is red and how the repair could branch."""
     attempts = ""
@@ -166,7 +177,7 @@ def diagnose(
             + "\n\n"
         )
 
-    user = f"""Test command: `{test_command}`
+    user = f"""{_task_block(goal, 4000)}Test command: `{test_command}`
 
 FAILURE OUTPUT
 {_failure_digest(report, stdout, stderr)}
@@ -302,6 +313,7 @@ def propose_patch(
     sources: dict[str, str],
     evidence: str = "",
     retry_note: str = "",
+    goal: str = "",
 ) -> tuple[list[Edit], str]:
     """Turn one hypothesis into one concrete patch.
 
@@ -320,7 +332,7 @@ def propose_patch(
         else ""
     )
     repair = f"\n\nA PREVIOUS ATTEMPT FAILED TO APPLY: {retry_note}\nDo not repeat it." if retry_note else ""
-    user = f"""Test command: `{test_command}`
+    user = f"""{_task_block(goal, 2000)}Test command: `{test_command}`
 
 DIAGNOSIS
 {root_cause}

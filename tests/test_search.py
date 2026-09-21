@@ -525,3 +525,48 @@ def test_without_branching_setup_runs_once_per_evaluation(backend):
     )
     assert result.stats["setup_runs"] >= 2, "each attempt rebuilds its environment"
     assert result.stats["setup_seconds_saved"] == 0.0
+
+
+def test_a_patch_that_edits_a_protected_test_never_reaches_the_sandbox(backend):
+    """Weakening the oracle is refused before execution, and the model is told why."""
+    cheat = {
+        "explanation": "the test expects the wrong total",
+        "edits": [{"path": "tests/test_billing.py", "new_content": "def test_nothing():\n    assert True\n"}],
+    }
+    llm = ScriptedLLM(
+        responses={
+            "super": [_diagnosis("the test encodes a wrong expectation", "tests/test_billing.py")],
+            "nano": [cheat, cheat],
+        }
+    )
+    settings = load_settings(backend="local", fanout=1, max_nodes=1, max_depth=1)
+    result = Arborist(settings, backend, llm).run(
+        RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD, protected=["tests/*"])
+    )
+
+    child = next(n for n in result.nodes if n.depth == 1)
+    assert child.status == "invalid"
+    assert "protected" in child.note
+    assert result.stats["sandbox_executions"] == 1, "only the baseline may run"
+    assert not result.solved
+    retry_prompt = [user for tier, user in llm.calls if tier == "nano"][-1]
+    assert "protected" in retry_prompt, "the retry must learn why the first patch was refused"
+
+
+def test_the_goal_reaches_diagnosis_and_patching(backend):
+    goal = "Invoices must round half-cents away from zero; see issue #12."
+    llm = _scripted_repair_sequence()
+    settings = load_settings(backend="local", fanout=1, max_nodes=8, max_depth=5)
+    Arborist(settings, backend, llm).run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD, goal=goal))
+
+    prompts = [user for tier, user in llm.calls if tier in {"super", "nano"}]
+    assert prompts
+    assert all(goal in user for user in prompts)
+
+
+def test_without_a_goal_the_prompts_are_unchanged(backend):
+    llm = _scripted_repair_sequence()
+    settings = load_settings(backend="local", fanout=1, max_nodes=8, max_depth=5)
+    Arborist(settings, backend, llm).run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
+    assert all(not user.startswith("TASK") for _tier, user in llm.calls)
+

@@ -7,6 +7,7 @@ from arborist.repo import (
     PatchError,
     apply_edits,
     changed_files,
+    is_protected,
     parse_junit,
     parse_pytest_text,
     select_context,
@@ -213,3 +214,68 @@ def test_a_file_that_was_already_broken_is_not_blamed_on_the_patch():
 def test_non_python_files_are_not_syntax_checked():
     out = apply_edits({"a.py": SAMPLE, "r.txt": "x"}, [Edit(path="r.txt", new_content="{{ not python")])
     assert out["r.txt"] == "{{ not python"
+
+
+# --------------------------------------------------------------------------- #
+# protected paths
+# --------------------------------------------------------------------------- #
+
+TEST_FILE = "def test_add():\n    assert add(1, 2) == 3\n"
+
+
+def test_a_protected_file_cannot_be_edited():
+    files = {"src/app.py": SAMPLE, "tests/test_app.py": TEST_FILE}
+    with pytest.raises(PatchError, match="protected"):
+        apply_edits(files, [Edit(path="tests/test_app.py", search="== 3", replace="== -1")], protected=["tests/*"])
+
+
+def test_a_protected_file_cannot_be_rewritten_either():
+    files = {"tests/test_app.py": TEST_FILE}
+    with pytest.raises(PatchError, match="protected"):
+        apply_edits(files, [Edit(path="tests/test_app.py", new_content="")], protected=["test_*.py"])
+
+
+def test_protection_also_covers_a_path_the_model_shortened():
+    """The model's path is resolved first, so a shortened path is no way around it."""
+    files = {"src/app.py": SAMPLE, "tests/test_app.py": TEST_FILE}
+    with pytest.raises(PatchError, match="protected"):
+        apply_edits(files, [Edit(path="test_app.py", search="== 3", replace="== -1")], protected=["tests/*"])
+
+
+def test_the_refusal_says_what_to_do_instead():
+    files = {"tests/test_app.py": TEST_FILE}
+    with pytest.raises(PatchError) as excinfo:
+        apply_edits(files, [Edit(path="tests/test_app.py", new_content="")], protected=["tests/*"])
+    assert "code under test" in str(excinfo.value)
+
+
+def test_a_pattern_without_a_slash_matches_any_basename():
+    assert is_protected("pkg/tests/test_x.py", ["test_*.py"])
+    assert is_protected("tests/unit/test_x.py", ["tests/*"])
+    assert not is_protected("pkg/src/x.py", ["test_*.py", "tests/*"])
+
+
+def test_unprotected_files_stay_editable():
+    files = {"src/app.py": SAMPLE, "tests/test_app.py": TEST_FILE}
+    out = apply_edits(files, [Edit(path="src/app.py", search="a - b", replace="a + b")], protected=["tests/*"])
+    assert "a + b" in out["src/app.py"]
+
+
+# --------------------------------------------------------------------------- #
+# path normalisation
+# --------------------------------------------------------------------------- #
+
+
+def test_a_dotfile_keeps_its_leading_dot():
+    """`lstrip("./")` strips a character set: `.coveragerc` became `coveragerc`."""
+    files = {".coveragerc": "[run]\nbranch = False\n"}
+    out = apply_edits(files, [Edit(path=".coveragerc", new_content="[run]\nbranch = True\n")])
+    assert out[".coveragerc"].endswith("True\n")
+    assert "coveragerc" not in out, "the rewrite must not create a second, undotted file"
+
+
+def test_a_leading_dot_slash_is_still_removed():
+    files = {"src/app.py": SAMPLE}
+    out = apply_edits(files, [Edit(path="./src/app.py", search="a - b", replace="a + b")])
+    assert "a + b" in out["src/app.py"]
+

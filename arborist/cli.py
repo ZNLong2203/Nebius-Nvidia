@@ -44,10 +44,17 @@ def fix(
     image: str = typer.Option("python:3.12-slim", "--image", help="OCI image for the sandbox."),
     backend: str = typer.Option(None, "--backend", help="contree | local"),
     fanout: int = typer.Option(None, "--fanout", "-k", help="Candidate patches per expansion."),
-    max_nodes: int = typer.Option(None, "--max-nodes", help="Hard cap on sandbox executions."),
+    max_nodes: int = typer.Option(
+        None, "--max-nodes", help="Hard cap on nodes, counting patches that never reach the sandbox."
+    ),
     max_depth: int = typer.Option(None, "--max-depth"),
     no_branching: bool = typer.Option(False, "--no-branching", help="Linear baseline: one attempt at a time, no checkpoint reuse."),
     context: list[str] = typer.Option([], "--context", "-c", help="Extra files or globs to always show the model."),
+    goal: str = typer.Option("", "--goal", help="What the repair is for, e.g. the issue text. Prefix with @ to read a file."),
+    protect: list[str] = typer.Option(
+        [], "--protect", "-p", help="Glob no patch may edit (repeatable). Protect the tests to keep the oracle honest."
+    ),
+    workdir: str = typer.Option(None, "--workdir", help="Repository location inside the sandbox image."),
     out: Path = typer.Option(Path("runs"), "--out", "-o", help="Where to write the run report."),
     quiet: bool = typer.Option(False, "--quiet", "-q"),
 ) -> None:
@@ -57,7 +64,10 @@ def fix(
         max_nodes=max_nodes,
         max_depth=max_depth,
         branching=False if no_branching else None,
+        workdir=workdir,
     )
+    if goal.startswith("@"):
+        goal = Path(goal[1:]).read_text(encoding="utf-8")
 
     if not settings.has_llm:
         console.print("[red]NEBIUS_API_KEY is not set.[/] Copy .env.example to .env and add your key.")
@@ -102,6 +112,8 @@ def fix(
         setup_command=setup,
         image=image,
         context_files=list(context),
+        goal=goal,
+        protected=list(protect),
     )
 
     console.print(

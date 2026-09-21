@@ -115,23 +115,30 @@ class PatchError(ValueError):
     pass
 
 
-def apply_edits(files: dict[str, str], edits: list[Edit]) -> dict[str, str]:
+def apply_edits(
+    files: dict[str, str], edits: list[Edit], protected: list[str] | tuple[str, ...] = ()
+) -> dict[str, str]:
     """Apply edits to a copy of ``files``.
 
     Raises :class:`PatchError` when an edit cannot be applied unambiguously.
     That check is deliberately strict and happens *before* we spend a sandbox
     execution: a malformed patch should cost tokens, not wall-clock.
+
+    ``protected`` holds glob patterns for files the patch may not touch --
+    typically the tests that define success. A prompt can ask a model not to
+    edit the oracle; only a check here can guarantee it.
     """
     if not edits:
         raise PatchError("patch contains no edits")
 
     updated = dict(files)
     for edit in edits:
-        path = edit.path.strip().lstrip("./")
+        path = _normalise_path(edit.path)
         if not path:
             raise PatchError("edit is missing a path")
 
         if edit.is_rewrite:
+            _refuse_protected(path, protected)
             updated[path] = edit.new_content or ""
             continue
 
@@ -142,6 +149,7 @@ def apply_edits(files: dict[str, str], edits: list[Edit]) -> dict[str, str]:
             if resolved is None:
                 raise PatchError(f"{path}: file not found in repository")
             path = resolved
+        _refuse_protected(path, protected)
 
         body = updated[path]
         occurrences = body.count(edit.search)
@@ -161,6 +169,36 @@ def apply_edits(files: dict[str, str], edits: list[Edit]) -> dict[str, str]:
 
     _reject_broken_syntax(files, updated)
     return updated
+
+
+def _normalise_path(raw: str) -> str:
+    """``./a/b`` and ``/a/b`` mean ``a/b``; ``.coveragerc`` stays ``.coveragerc``.
+
+    ``str.lstrip("./")`` strips a character *set*, which quietly turned every
+    dotfile into a different, new file.
+    """
+    path = raw.strip()
+    while path.startswith("./"):
+        path = path[2:]
+    return path.lstrip("/")
+
+
+def is_protected(path: str, protected: list[str] | tuple[str, ...]) -> bool:
+    """Match like .gitignore: a pattern without a slash matches any basename."""
+    name = path.rsplit("/", 1)[-1]
+    for pattern in protected:
+        pattern = _normalise_path(pattern)
+        if fnmatch.fnmatch(path, pattern) or ("/" not in pattern and fnmatch.fnmatch(name, pattern)):
+            return True
+    return False
+
+
+def _refuse_protected(path: str, protected: list[str] | tuple[str, ...]) -> None:
+    if protected and is_protected(path, protected):
+        raise PatchError(
+            f"{path}: this file is protected -- it defines what a correct repair is. "
+            "Change the code under test, not the test."
+        )
 
 
 def _reject_broken_syntax(before: dict[str, str], after: dict[str, str]) -> None:

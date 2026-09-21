@@ -172,19 +172,22 @@ class ContreeBackend:
         return self._forks
 
     def base(self, files: dict[str, bytes], image: str) -> Checkpoint:
-        # `oci` resolves an image already known to the project and imports it
-        # from its registry otherwise. `use` only does the former, so any image
-        # not imported beforehand failed at the first run.
-        img = self._sdk.images.oci(image, timeout=self._timeout)
-        # One run materialises the repo inside the image and gives us the first
-        # reusable checkpoint. Everything after this forks from here.
-        staged = img.run(
-            shell=f"mkdir -p {self._workdir} && ls -la {self._workdir}",
-            files={f"{self._workdir}/{p}": data for p, data in files.items()},
-            cwd="/",
-            disposable=False,
-            timeout=self._timeout,
-        ).wait()
+        def stage():
+            # `oci` resolves an image already known to the project and imports
+            # it from its registry otherwise. `use` only does the former, so any
+            # image not imported beforehand failed at the first run.
+            img = self._sdk.images.oci(image, timeout=self._timeout)
+            # One run materialises the repo inside the image and gives us the
+            # first reusable checkpoint. Everything after this forks from here.
+            return img.run(
+                shell=f"mkdir -p {self._workdir} && ls -la {self._workdir}",
+                files={f"{self._workdir}/{p}": data for p, data in files.items()},
+                cwd="/",
+                disposable=False,
+                timeout=self._timeout,
+            ).wait()
+
+        staged = _with_retries(stage)
         return Checkpoint(id=str(staged.uuid), handle=staged, label="base")
 
     def run(
@@ -198,14 +201,16 @@ class ContreeBackend:
         payload = {f"{self._workdir}/{p}": data for p, data in (files or {}).items()}
         limit = int(timeout or self._timeout)
         try:
-            result = checkpoint.handle.run(
-                shell=_bounded(command, limit),
-                cwd=self._workdir,
-                files=payload or None,
-                disposable=False,
-                # The in-sandbox bound ends the command; this is only the wait.
-                timeout=limit + 120,
-            ).wait()
+            result = _with_retries(
+                lambda: checkpoint.handle.run(
+                    shell=_bounded(command, limit),
+                    cwd=self._workdir,
+                    files=payload or None,
+                    disposable=False,
+                    # The in-sandbox bound ends the command; this is only the wait.
+                    timeout=limit + 120,
+                ).wait()
+            )
         except Exception as exc:  # noqa: BLE001 - surfaced to the node, never fatal
             return ExecResult(
                 checkpoint=checkpoint,
@@ -239,6 +244,26 @@ class ContreeBackend:
 
 
 TIMED_OUT = 124  # coreutils `timeout` exit status
+RETRY_DELAYS = (3.0, 10.0)
+
+
+def _with_retries(call):
+    """Run a Sandboxes call, repeating it when the API itself fails.
+
+    Every exception here is infrastructure, never the code under test: a
+    command that runs too long ends inside the sandbox with exit 124, and a
+    failing suite is an exit code. What raises is the API -- a status poll
+    that timed out mid-read, a dropped connection. One such blip at the
+    baseline used to end an eval run before the agent acted, and score it as
+    a loss. Repeating is safe because nothing is mutated: the retry forks the
+    same immutable checkpoint again.
+    """
+    for delay in RETRY_DELAYS:
+        try:
+            return call()
+        except Exception:  # noqa: BLE001 - retried, then raised below
+            time.sleep(delay)
+    return call()
 
 
 def _bounded(command: str, seconds: int) -> str:

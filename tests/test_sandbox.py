@@ -276,3 +276,52 @@ def test_a_sandbox_run_that_hit_the_bound_says_so():
     result = backend.run(base, "pytest -q", timeout=5)
     assert result.error == "timed out after 5s"
     assert "timeout -k 10 5" in log[-1]["shell"]
+
+
+def test_an_api_failure_is_retried_rather_than_scored(monkeypatch):
+    """A status poll timing out is the API's problem, not the patch's."""
+    from arborist import sandbox
+
+    monkeypatch.setattr(sandbox, "RETRY_DELAYS", (0.0, 0.0))
+    log = []
+    sdk = _FakeSdk({"spawn": True, "import": True})
+    sdk.images = _FakeImages(log)
+    backend = _backend_with(sdk)
+    base = backend.base({"a.py": b"x"}, "img")
+
+    class _Flaky(_FakeState):
+        failures = 1
+
+        def run(self, **kwargs):
+            if _Flaky.failures:
+                _Flaky.failures -= 1
+                raise TimeoutError("read timed out polling the operation")
+            return super().run(**kwargs)
+
+    base.handle.__class__ = _Flaky
+    result = backend.run(base, "pytest -q")
+    assert result.error == ""
+    assert result.exit_code == 0
+
+
+def test_an_api_that_keeps_failing_is_reported_not_raised(monkeypatch):
+    from arborist import sandbox
+
+    monkeypatch.setattr(sandbox, "RETRY_DELAYS", (0.0, 0.0))
+    log = []
+    sdk = _FakeSdk({"spawn": True, "import": True})
+    sdk.images = _FakeImages(log)
+    backend = _backend_with(sdk)
+    base = backend.base({"a.py": b"x"}, "img")
+
+    calls = []
+
+    class _Down(_FakeState):
+        def run(self, **kwargs):
+            calls.append(1)
+            raise ConnectionError("no route to host")
+
+    base.handle.__class__ = _Down
+    result = backend.run(base, "pytest -q")
+    assert result.error.startswith("ConnectionError")
+    assert len(calls) == 3, "two retries, then give up"

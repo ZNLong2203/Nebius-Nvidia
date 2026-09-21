@@ -280,6 +280,16 @@ function Explainer({ result }: { result: RunResult | null }) {
  * where, and a patch that touches two distant functions then reads as one
  * edit. Hunk headers are kept so the line numbers survive.
  */
+/** `@@ -12,7 +12,8 @@` -> "lines 12–19": where the change is, in words a reader uses. */
+function hunkLocation(header: string): string {
+  const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@\s*(.*)$/.exec(header);
+  if (!match) return header;
+  const start = Number(match[1]);
+  const length = match[2] === undefined ? 1 : Number(match[2]);
+  const where = length > 1 ? `lines ${start}–${start + length - 1}` : `line ${start}`;
+  return match[3] ? `${where} · ${match[3]}` : where;
+}
+
 function UnifiedDiff({ diff }: { diff: string }) {
   type Hunk = { header: string; removed: string[]; added: string[] };
   const files: { path: string; hunks: Hunk[] }[] = [];
@@ -312,9 +322,7 @@ function UnifiedDiff({ diff }: { diff: string }) {
         <div key={f.path} className="space-y-2">
           {f.hunks.map((h, index) => (
             <div key={index}>
-              {f.hunks.length > 1 && (
-                <div className="mono mb-1 text-[10.5px] text-ink-3">{h.header}</div>
-              )}
+              <div className="mono mb-1 text-[10.5px] text-ink-3">{hunkLocation(h.header)}</div>
               <DiffBlock
                 path={index === 0 ? f.path : undefined}
                 removed={h.removed.join("\n")}

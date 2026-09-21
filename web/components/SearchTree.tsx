@@ -34,6 +34,20 @@ export function SearchTree({
   const winning = useMemo(() => winningPathIds(nodes, winnerId), [nodes, winnerId]);
   const layout = useMemo(() => layoutTree(nodes, winning), [nodes, winning]);
   const lit = useMemo(() => ancestryIds(nodes, hovered), [nodes, hovered]);
+  // The tree is drawn flat in SVG, so position has to be stated rather than
+  // implied by nesting: "3 of 4 at this level" is what a screen reader needs.
+  const siblings = useMemo(() => {
+    const groups = new Map<string, string[]>();
+    for (const node of nodes) {
+      const key = node.parent_id ?? "";
+      groups.set(key, [...(groups.get(key) ?? []), node.id]);
+    }
+    const position = new Map<string, { index: number; size: number }>();
+    for (const ids of groups.values()) {
+      ids.forEach((id, index) => position.set(id, { index: index + 1, size: ids.length }));
+    }
+    return position;
+  }, [nodes]);
 
   const { view, dragging, fit, zoomBy, panBy, onPointerDown, consumedDrag } = useViewport(
     containerRef,
@@ -142,6 +156,8 @@ export function SearchTree({
                     role="treeitem"
                     aria-selected={selected}
                     aria-level={node.depth + 1}
+                    aria-posinset={siblings.get(node.id)?.index}
+                    aria-setsize={siblings.get(node.id)?.size}
                     aria-label={
                       `${meta.label}, level ${node.depth + 1}: ${title}, ${passing} tests passing` +
                       (node.regressions.length ? `, broke ${node.regressions.length} tests` : "")

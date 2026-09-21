@@ -135,3 +135,24 @@ def test_load_report_rejects_something_that_is_not_a_run(tmp_path):
 
 def test_load_report_reads_a_real_one(report_file):
     assert load_report(report_file)["solved"] is True
+
+
+def test_a_rationale_that_thinks_aloud_stays_out_of_the_pull_request():
+    from arborist.report import _concise
+
+    rambling = (
+        "Python's round() uses banker's rounding, which rounds 2.675 to 2.67 because the digit is odd? "
+        "Actually, 2.675 is exactly halfway; wait: the even digit rule rounds to 2.68? Let me clarify: "
+        "the number is 2.675 and the two possibilities are 2.67 and 2.68, and in practice it rounds down."
+    )
+    assert _concise(rambling) == "", "a first sentence that ends in a question is not a statement"
+
+    long_but_clear = (
+        "billed_days returns (end - start).days, which excludes the end date. "
+        + "The docstring says both endpoints are inclusive, so a subscription from the 1st "
+        + "to the 30th must bill 30 days, and every caller of billed_days inherits the error. " * 2
+    )
+    assert _concise(long_but_clear) == "billed_days returns (end - start).days, which excludes the end date."
+
+    short = "The coupon is applied after tax."
+    assert _concise(short) == short

@@ -14,6 +14,7 @@ test-level reason each one lost.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -257,6 +258,26 @@ def render_pr_body(report: dict, *, repo_url: str = "") -> str:
     return "\n".join(out).rstrip() + "\n"
 
 
+RATIONALE_LIMIT = 280
+
+
+def _concise(text: str, limit: int = RATIONALE_LIMIT) -> str:
+    """A rationale short enough to belong in a pull request, or nothing.
+
+    A model occasionally reasons aloud inside the field -- "...is odd?
+    Actually, 2.675 is exactly halfway... Wait:" -- and a reviewer should not
+    have to read that. Short rationales pass through; a long one is cut to its
+    first sentence when that sentence is a plain statement, and dropped
+    otherwise. The patch's own explanation, which follows, still says what
+    was tried, and the run report keeps every word.
+    """
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    first = re.split(r"(?<=[.!?])\s", text, maxsplit=1)[0]
+    return first if first.endswith(".") and len(first) <= limit else ""
+
+
 def _render_alternative(node: dict) -> str:
     mark = STATUS_MARK.get(node["status"], "•")
     title = (node.get("hypothesis") or {}).get("title") or node.get("note") or "patch"
@@ -277,8 +298,9 @@ def _render_alternative(node: dict) -> str:
         reason = f"reached {passing} but its branch did not get to green"
 
     block = [f"<details><summary>{mark} <b>{title}</b> — {reason}</summary>", ""]
-    if node.get("hypothesis", {}).get("rationale"):
-        block.append(f"_{node['hypothesis']['rationale']}_")
+    rationale = _concise((node.get("hypothesis") or {}).get("rationale") or "")
+    if rationale:
+        block.append(f"_{rationale}_")
         block.append("")
     if node.get("explanation"):
         block.append(node["explanation"])

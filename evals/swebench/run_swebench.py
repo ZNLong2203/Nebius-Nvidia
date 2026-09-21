@@ -607,11 +607,24 @@ def run(args) -> int:
                 print(f"-> {row['instance_id']} [{label}] run {repetition}", flush=True)
                 # A hung run dumps every thread's stack and exits; results so
                 # far are on disk, and --resume continues from here.
-                faulthandler.dump_traceback_later(args.run_limit * 60, exit=True)
-                try:
-                    result = run_one(row, valid[row["instance_id"]], branching, repetition, args)
-                finally:
-                    faulthandler.cancel_dump_traceback_later()
+                result = None
+                for _attempt in range(3):
+                    wall, awake = time.time(), time.monotonic()
+                    faulthandler.dump_traceback_later(args.run_limit * 60, exit=True)
+                    try:
+                        candidate = run_one(row, valid[row["instance_id"]], branching, repetition, args)
+                    finally:
+                        faulthandler.cancel_dump_traceback_later()
+                    # On macOS the monotonic clock stops while the machine
+                    # sleeps; a run a closed lid interrupted is not counted.
+                    slept = (time.time() - wall) - (time.monotonic() - awake)
+                    if slept <= 30:
+                        result = candidate
+                        break
+                    print(f"   the machine slept {slept:.0f}s during this run -- repeating", flush=True)
+                if result is None:
+                    print("   still disturbed after three attempts; left for --resume", flush=True)
+                    continue
                 rows.append(result)
                 write(rows, out)
                 print(

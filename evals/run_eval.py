@@ -199,13 +199,34 @@ def markdown(rows: list[Row]) -> str:
     return head + body
 
 
+SLEEP_TOLERANCE = 30.0
+"""Seconds a run may lose to the machine sleeping before it stops counting."""
+
+
+class Awake:
+    """How long the machine slept since this was created.
+
+    On macOS time.monotonic() is mach_absolute_time, which stops while the
+    machine sleeps; time.time() does not. The gap is the sleep. A run a
+    closed lid interrupted is not a measurement: its wall time includes the
+    nap, and the connections the nap dropped can change what the search did.
+    """
+
+    def __init__(self) -> None:
+        self._wall, self._awake = time.time(), time.monotonic()
+
+    def slept(self) -> float:
+        return (time.time() - self._wall) - (time.monotonic() - self._awake)
+
+
 def watch_for_hangs() -> None:
     """Make a stuck sweep say where it is stuck.
 
-    One run once sat for an hour with every connection closed and nothing to
-    show for it. `kill -USR1 <pid>` now prints every thread's stack, and a run
-    past --run-limit prints them and exits -- results so far are already on
-    disk, so `--resume` picks up from the run that hung.
+    `kill -USR1 <pid>` prints every thread's stack, and a run past
+    --run-limit prints them and exits -- results so far are already on disk,
+    so `--resume` picks up from the run that hung. The limit is measured on
+    the monotonic clock, so it does not count time the machine spent asleep;
+    `Awake` catches that case instead.
     """
     import signal
 
@@ -363,21 +384,32 @@ def main() -> int:
                 continue
             label = "branching on " if branching else "branching off"
             print(f"-> {name} [{args.model_set}] [{label}] run {repetition}/{args.repeat}", flush=True)
-            faulthandler.dump_traceback_later(args.run_limit * 60, exit=True)
-            try:
-                row = run_case(
-                    name,
-                    spec,
-                    branching=branching,
-                    backend_name=settings.backend,
-                    fanout=args.fanout,
-                    max_nodes=args.max_nodes,
-                    model_set=args.model_set,
-                    repetition=repetition,
-                    reports_dir=Path(args.reports) if args.reports else None,
-                )
-            finally:
-                faulthandler.cancel_dump_traceback_later()
+            row = None
+            for _attempt in range(3):
+                clock = Awake()
+                faulthandler.dump_traceback_later(args.run_limit * 60, exit=True)
+                try:
+                    candidate = run_case(
+                        name,
+                        spec,
+                        branching=branching,
+                        backend_name=settings.backend,
+                        fanout=args.fanout,
+                        max_nodes=args.max_nodes,
+                        model_set=args.model_set,
+                        repetition=repetition,
+                        reports_dir=Path(args.reports) if args.reports else None,
+                    )
+                finally:
+                    faulthandler.cancel_dump_traceback_later()
+                slept = clock.slept()
+                if slept <= SLEEP_TOLERANCE:
+                    row = candidate
+                    break
+                print(f"   the machine slept {slept:.0f}s during this run -- not a measurement, repeating", flush=True)
+            if row is None:
+                print("   still disturbed after three attempts; left for --resume", flush=True)
+                continue
             rows.append(row)
             write_results(rows, out, settings, args)
             print(f"   solved={row.solved} sandbox_runs={row.sandbox_runs} wall={row.wall_seconds}s", flush=True)

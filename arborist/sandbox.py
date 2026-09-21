@@ -252,11 +252,12 @@ def _with_retries(call):
 
     Every exception here is infrastructure, never the code under test: a
     command that runs too long ends inside the sandbox with exit 124, and a
-    failing suite is an exit code. What raises is the API -- a status poll
-    that timed out mid-read, a dropped connection. One such blip at the
-    baseline used to end an eval run before the agent acted, and score it as
-    a loss. Repeating is safe because nothing is mutated: the retry forks the
-    same immutable checkpoint again.
+    failing suite is an exit code. What raises is the API or the path to it
+    -- a status poll that timed out mid-read, a dropped connection. One such
+    error at a baseline (there caused by the laptop running the sweep going to
+    sleep) ended an eval run before the agent acted, and scored it as a loss.
+    Repeating is safe because nothing is mutated: the retry forks the same
+    immutable checkpoint again.
     """
     for delay in RETRY_DELAYS:
         try:
@@ -269,9 +270,10 @@ def _with_retries(call):
 def _bounded(command: str, seconds: int) -> str:
     """Run ``command`` under a time limit enforced inside the sandbox.
 
-    The SDK's own timeout is a client-side wait, and a run has been observed
-    to sit past it for most of an hour. A patch that makes a suite loop
-    forever -- which agents do write -- has to end the command, not the run.
+    The SDK's own timeout is a client-side wait: a SWE-bench validation run
+    whose tests blocked on a network call sat for 51 minutes against a
+    30-minute timeout. A patch that makes a suite loop forever -- which agents
+    do write -- has to end the command, not the run.
     Images without coreutils `timeout` run the command unbounded, as before.
     """
     quoted = shlex.quote(command)

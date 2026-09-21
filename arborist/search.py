@@ -629,7 +629,9 @@ class Arborist:
             )
 
         try:
-            verdict = adjudicate(self.llm, candidates=candidates, test_command=cfg.test_command)
+            verdict = adjudicate(
+                self.llm, candidates=candidates, test_command=cfg.test_command, goal=cfg.goal
+            )
         except Exception:  # noqa: BLE001 - a failed tiebreak keeps the test-based winner
             return best
 

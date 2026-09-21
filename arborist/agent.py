@@ -126,6 +126,23 @@ input is WORSE than a failing patch: say so.
 Reply with JSON only:
 {"winner": "<node id>", "reason": "...", "suspicious": ["<node id>", ...]}"""
 
+# Every field required, for the same reason as DIAGNOSE_SCHEMA: with
+# `strict: false` a model leaves out whatever it is allowed to, and a missing
+# `suspicious` list would read as "nothing here games the suite".
+ADJUDICATE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "winner": {"type": "string", "description": "id of the candidate that should win"},
+        "reason": {"type": "string"},
+        "suspicious": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "ids of candidates that pass by weakening the suite rather than fixing the code",
+        },
+    },
+    "required": ["winner", "reason", "suspicious"],
+}
+
 
 def _task_block(goal: str, limit: int) -> str:
     """The stated purpose of the repair, when there is one, ahead of everything."""
@@ -372,7 +389,7 @@ Write the minimal patch that implements this hypothesis."""
     return edits, (data.get("explanation") or "").strip()
 
 
-def adjudicate(llm: LLM, *, candidates: list[dict], test_command: str) -> dict:
+def adjudicate(llm: LLM, *, candidates: list[dict], test_command: str, goal: str = "") -> dict:
     """Break a tie between branches the tests scored the same.
 
     This is the only place Ultra is used on the happy path, and only when the
@@ -388,5 +405,5 @@ Score: {c['score']}  (fixed: {c['fixed']}, regressions: {c['regressions']})
 Diff:
 {c['diff'][:4000]}"""
         )
-    user = f"Test command: `{test_command}`\n\n" + "\n\n".join(rendered)
-    return llm.json("ultra", ADJUDICATE_SYSTEM, user, temperature=0.1, max_tokens=4000)
+    user = f"{_task_block(goal, 2000)}Test command: `{test_command}`\n\n" + "\n\n".join(rendered)
+    return llm.json("ultra", ADJUDICATE_SYSTEM, user, ADJUDICATE_SCHEMA, temperature=0.1, max_tokens=4000)

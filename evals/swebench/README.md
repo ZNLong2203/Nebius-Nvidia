@@ -42,10 +42,19 @@ space inside a parameter.
 ### Validation — before any model is called
 
 An instance whose environment is broken would be scored as an agent failure.
-So every instance is first run twice in the sandbox, with no model involved:
+So every instance is first run in the sandbox with no model involved:
 
-1. with the test patch only — at least one FAIL_TO_PASS test must **fail**;
-2. with the test patch and the reference fix — every listed test must **pass**.
+1. with the test patch only — the command must be **red**, and red the same
+   way **twice**: the same listed tests failing, or the same failure no test
+   owns (`pytest-7168`'s bug crashes pytest itself, so it surfaces as an
+   internal error rather than a failed test);
+2. with the test patch and the reference fix — every listed test must
+   **pass**, **twice**.
+
+Running each state twice is what catches a suite that is not deterministic.
+`psf/requests` tests call a live HTTP service, and in a first validation pass
+the same instance's FAIL_TO_PASS test failed in one run and passed in the next.
+An agent scored against such a suite would be scored partly on the network.
 
 An instance failing either check is excluded, and listed in
 `validation.json` with the reason, together with the exact command it was

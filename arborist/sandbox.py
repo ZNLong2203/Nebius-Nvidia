@@ -21,7 +21,9 @@ credentials. It is a development aid, not the product.
 from __future__ import annotations
 
 import os
+import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -194,13 +196,15 @@ class ContreeBackend:
     ) -> ExecResult:
         started = time.time()
         payload = {f"{self._workdir}/{p}": data for p, data in (files or {}).items()}
+        limit = int(timeout or self._timeout)
         try:
             result = checkpoint.handle.run(
-                shell=command,
+                shell=_bounded(command, limit),
                 cwd=self._workdir,
                 files=payload or None,
                 disposable=False,
-                timeout=timeout or self._timeout,
+                # The in-sandbox bound ends the command; this is only the wait.
+                timeout=limit + 120,
             ).wait()
         except Exception as exc:  # noqa: BLE001 - surfaced to the node, never fatal
             return ExecResult(
@@ -213,12 +217,14 @@ class ContreeBackend:
             )
 
         self._forks += 1
+        exit_code = int(result.exit_code or 0)
         return ExecResult(
             checkpoint=Checkpoint(id=str(result.uuid), handle=result),
-            exit_code=int(result.exit_code or 0),
+            exit_code=exit_code,
             stdout=_as_text(result.stdout),
             stderr=_as_text(result.stderr),
             seconds=time.time() - started,
+            error=f"timed out after {limit}s" if exit_code == TIMED_OUT else "",
         )
 
     def read(self, checkpoint: Checkpoint, path: str) -> bytes | None:
@@ -230,6 +236,24 @@ class ContreeBackend:
 
     def close(self) -> None:  # pragma: no cover - nothing to release
         return None
+
+
+TIMED_OUT = 124  # coreutils `timeout` exit status
+
+
+def _bounded(command: str, seconds: int) -> str:
+    """Run ``command`` under a time limit enforced inside the sandbox.
+
+    The SDK's own timeout is a client-side wait, and a run has been observed
+    to sit past it for most of an hour. A patch that makes a suite loop
+    forever -- which agents do write -- has to end the command, not the run.
+    Images without coreutils `timeout` run the command unbounded, as before.
+    """
+    quoted = shlex.quote(command)
+    return (
+        f"if command -v timeout >/dev/null 2>&1; "
+        f"then timeout -k 10 {seconds} sh -c {quoted}; else sh -c {quoted}; fi"
+    )
 
 
 def _as_text(value: Any) -> str:
@@ -309,30 +333,42 @@ class LocalBackend:
         # system python with no pytest.
         interpreter_bin = str(Path(sys.executable).parent)
         env["PATH"] = interpreter_bin + os.pathsep + env.get("PATH", "")
+        limit = timeout or self._timeout
+        # Its own process group, so a timeout kills pytest and everything it
+        # started. `subprocess.run(timeout=...)` kills only the shell: the test
+        # process it launched kept running, orphaned, after the node was
+        # already marked as timed out -- and a looping patch kept a core busy.
+        proc = subprocess.Popen(
+            command,
+            shell=True,
+            cwd=child.handle,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+            start_new_session=True,
+        )
         try:
-            proc = subprocess.run(
-                command,
-                shell=True,
-                cwd=child.handle,
-                capture_output=True,
-                text=True,
-                timeout=timeout or self._timeout,
-                env=env,
-            )
+            stdout, stderr = proc.communicate(timeout=limit)
         except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            stdout, stderr = proc.communicate()
             return ExecResult(
                 checkpoint=child,
                 exit_code=-1,
-                stdout="",
-                stderr="",
+                stdout=stdout or "",
+                stderr=stderr or "",
                 seconds=time.time() - started,
-                error="timeout",
+                error=f"timed out after {limit:.0f}s",
             )
         return ExecResult(
             checkpoint=child,
             exit_code=proc.returncode,
-            stdout=proc.stdout or "",
-            stderr=proc.stderr or "",
+            stdout=stdout or "",
+            stderr=stderr or "",
             seconds=time.time() - started,
         )
 

@@ -18,6 +18,7 @@ nothing about the sandbox.
 from __future__ import annotations
 
 import argparse
+import faulthandler
 import json
 import statistics
 import subprocess
@@ -198,6 +199,21 @@ def markdown(rows: list[Row]) -> str:
     return head + body
 
 
+def watch_for_hangs() -> None:
+    """Make a stuck sweep say where it is stuck.
+
+    One run once sat for an hour with every connection closed and nothing to
+    show for it. `kill -USR1 <pid>` now prints every thread's stack, and a run
+    past --run-limit prints them and exits -- results so far are already on
+    disk, so `--resume` picks up from the run that hung.
+    """
+    import signal
+
+    faulthandler.enable()
+    if hasattr(signal, "SIGUSR1"):
+        faulthandler.register(signal.SIGUSR1, all_threads=True)
+
+
 def code_version() -> str:
     """The commit the numbers came from, marked when the tree had local changes.
 
@@ -312,7 +328,15 @@ def main() -> int:
     parser.add_argument(
         "--reports", default="evals/reports", help="where to keep each run's full tree"
     )
+    parser.add_argument(
+        "--run-limit",
+        type=float,
+        default=45,
+        help="minutes one run may take before the sweep dumps every thread's stack and exits; "
+        "rerun with --resume to continue",
+    )
     args = parser.parse_args()
+    watch_for_hangs()
 
     settings = load_settings(backend=args.backend)
     if not settings.has_llm:
@@ -339,17 +363,21 @@ def main() -> int:
                 continue
             label = "branching on " if branching else "branching off"
             print(f"-> {name} [{args.model_set}] [{label}] run {repetition}/{args.repeat}", flush=True)
-            row = run_case(
-                name,
-                spec,
-                branching=branching,
-                backend_name=settings.backend,
-                fanout=args.fanout,
-                max_nodes=args.max_nodes,
-                model_set=args.model_set,
-                repetition=repetition,
-                reports_dir=Path(args.reports) if args.reports else None,
-            )
+            faulthandler.dump_traceback_later(args.run_limit * 60, exit=True)
+            try:
+                row = run_case(
+                    name,
+                    spec,
+                    branching=branching,
+                    backend_name=settings.backend,
+                    fanout=args.fanout,
+                    max_nodes=args.max_nodes,
+                    model_set=args.model_set,
+                    repetition=repetition,
+                    reports_dir=Path(args.reports) if args.reports else None,
+                )
+            finally:
+                faulthandler.cancel_dump_traceback_later()
             rows.append(row)
             write_results(rows, out, settings, args)
             print(f"   solved={row.solved} sandbox_runs={row.sandbox_runs} wall={row.wall_seconds}s", flush=True)

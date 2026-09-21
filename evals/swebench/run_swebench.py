@@ -33,9 +33,11 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import faulthandler
 import json
 import shlex
 import shutil
+import signal
 import statistics
 import subprocess
 import sys
@@ -285,6 +287,7 @@ def validate_one(row: dict) -> Validation:
         files = load_repo(work)
         gold = files_after_patch(work, row["patch"])
         listed = Listed(row)
+        test_paths = test_files(row)
 
         sandbox = backend()
         t = time.time()
@@ -292,34 +295,50 @@ def validate_one(row: dict) -> Validation:
         v.base_seconds = round(time.time() - t, 1)
 
         # 1. Everything in the test files, to learn which tests SWE-bench ignores.
-        before, result, seconds = run_suite(sandbox, base, file_command(row))
+        first, result, seconds = run_suite(sandbox, base, file_command(row))
         v.suite_seconds = round(seconds, 1)
-        if result.error:
-            v.reason = f"suite did not run: {result.error[:200]}"
+        if result.error or first is None or first.total == 0:
+            v.reason = f"suite did not run: {(result.error or 'no results')[:200]}"
             return v
-        if before is None or before.total == 0:
-            v.reason = "no test results without the fix"
-            return v
-        seen = before.passed_ids | before.failed_ids
-        unlisted = sorted(t for t in seen if t not in listed)
-        deselect = [n for n in (node_id(t, test_files(row)) for t in unlisted) if n]
+        seen = first.passed_ids | first.failed_ids
+        unlisted = sorted(t for t in seen if t not in listed and node_id(t, test_paths))
+        deselect = [node_id(t, test_paths) for t in unlisted]
         v.deselected = len(deselect)
         v.command = file_command(row, deselect)
         v.tests = len(seen) - len(unlisted)
-        v.failing_before = sum(1 for t in before.failed_ids if t in listed)
-        if not any(listed.fails_to_pass(t) for t in before.failed_ids):
-            v.reason = "no FAIL_TO_PASS test fails without the fix"
+
+        def blocking(report) -> set[str]:
+            # A listed test failing, or a failure no test file owns: a
+            # collection error, or pytest itself crashing (pytest-7168's bug
+            # is an INTERNALERROR, so none of its tests ever reports failed).
+            return {t for t in report.failed_ids if t in listed or node_id(t, test_paths) is None}
+
+        # 2. Without the fix the command must be red -- the same way twice.
+        red = [blocking(first)]
+        again, result, _ = run_suite(sandbox, base, v.command)
+        if result.error or again is None:
+            v.reason = f"suite did not run: {(result.error or 'no results')[:200]}"
+            return v
+        red.append(blocking(again))
+        v.failing_before = len(red[1])
+        if not red[1]:
+            v.reason = "nothing listed fails without the fix"
+            return v
+        if red[0] != red[1]:
+            v.reason = f"nondeterministic without the fix: {sorted(red[0] ^ red[1])[:3]}"
             return v
 
-        # 2. The reference fix must turn every listed test green.
-        after, result, _ = run_suite(sandbox, base, v.command, files=gold)
-        if result.error or after is None:
-            v.reason = f"suite did not run with the reference fix: {(result.error or '')[:200]}"
-            return v
-        if not after.green:
-            bad = sorted(after.failed_ids)[:3]
-            v.reason = f"reference fix leaves {after.failed + after.errors} listed failing: {bad}"
-            return v
+        # 3. With the reference fix it must be green -- twice.
+        for attempt in (1, 2):
+            after, result, _ = run_suite(sandbox, base, v.command, files=gold)
+            if result.error or after is None:
+                v.reason = f"suite did not run with the reference fix: {(result.error or '')[:200]}"
+                return v
+            if not after.green:
+                bad = sorted(after.failed_ids)[:3]
+                word = "leaves" if attempt == 1 else "is nondeterministic, second run leaves"
+                v.reason = f"reference fix {word} {after.failed + after.errors} failing: {bad}"
+                return v
         v.valid = True
         return v
     except Exception as exc:  # noqa: BLE001 - one broken instance must not stop the rest
@@ -560,7 +579,13 @@ def run(args) -> int:
                     continue
                 label = "branching" if branching else "linear   "
                 print(f"-> {row['instance_id']} [{label}] run {repetition}", flush=True)
-                result = run_one(row, valid[row["instance_id"]], branching, repetition, args)
+                # A hung run dumps every thread's stack and exits; results so
+                # far are on disk, and --resume continues from here.
+                faulthandler.dump_traceback_later(args.run_limit * 60, exit=True)
+                try:
+                    result = run_one(row, valid[row["instance_id"]], branching, repetition, args)
+                finally:
+                    faulthandler.cancel_dump_traceback_later()
                 rows.append(result)
                 write(rows, out)
                 print(
@@ -590,8 +615,12 @@ def main() -> int:
     r.add_argument("--out", default=str(HERE / "results.md"))
     r.add_argument("--resume", action="store_true")
     r.add_argument("--reports", action="store_true", help="save every run's full tree")
+    r.add_argument("--run-limit", type=float, default=60, help="minutes before a stuck run is abandoned")
 
     args = parser.parse_args()
+    faulthandler.enable()
+    if hasattr(signal, "SIGUSR1"):
+        faulthandler.register(signal.SIGUSR1, all_threads=True)
     return validate(args) if args.phase == "validate" else run(args)
 
 

@@ -222,3 +222,57 @@ def test_the_workdir_is_where_files_land_commands_run_and_reports_are_read():
     backend.read(base, ".arborist/report.xml")
     assert log[2] == {"read": "/testbed/.arborist/report.xml"}
 
+
+
+def test_a_local_timeout_kills_the_whole_process_tree(tmp_path):
+    """Killing only the shell left the test process running, orphaned."""
+    import subprocess
+    import time
+
+    backend = LocalBackend(root=tmp_path, timeout=30)
+    base = backend.base({"a.txt": b"x"}, "unused")
+    started = time.time()
+    result = backend.run(base, "sleep 31.7 | cat", timeout=1)
+    assert time.time() - started < 10
+    assert result.error.startswith("timed out")
+
+    time.sleep(0.3)
+    survivors = subprocess.run(["pgrep", "-f", "sleep 31.7"], capture_output=True, text=True).stdout
+    assert not survivors.strip(), "nothing the command started may outlive it"
+
+
+def test_the_sandbox_command_is_bounded_inside_the_sandbox():
+    """The SDK's wait is client-side; the bound has to live in the command itself."""
+    import shutil
+    import subprocess
+    import time
+
+    import pytest
+
+    from arborist.sandbox import TIMED_OUT, _bounded
+
+    if shutil.which("timeout") is None:
+        pytest.skip("coreutils timeout is not installed here")
+    started = time.time()
+    done = subprocess.run(["sh", "-c", _bounded("sleep 30", 1)], capture_output=True)
+    assert done.returncode == TIMED_OUT
+    assert time.time() - started < 15
+
+
+def test_a_sandbox_run_that_hit_the_bound_says_so():
+    log = []
+    sdk = _FakeSdk({"spawn": True, "import": True})
+    sdk.images = _FakeImages(log)
+    backend = _backend_with(sdk)
+    base = backend.base({"a.py": b"x"}, "img")
+
+    class _Late(_FakeState):
+        def run(self, **kwargs):
+            state = super().run(**kwargs)
+            state.exit_code = 124
+            return state
+
+    base.handle.__class__ = _Late
+    result = backend.run(base, "pytest -q", timeout=5)
+    assert result.error == "timed out after 5s"
+    assert "timeout -k 10 5" in log[-1]["shell"]

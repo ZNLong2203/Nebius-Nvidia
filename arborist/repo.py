@@ -78,7 +78,7 @@ def select_context(
     chosen: dict[str, str] = {}
     used = 0
     for want in wanted:
-        want = want.strip().lstrip("./")
+        want = _normalise_path(want)
         if not want:
             continue
         matches = [want] if want in files else sorted(
@@ -94,15 +94,52 @@ def select_context(
             used += len(body)
 
     if fill:
-        for path in sorted(files):
-            if path in chosen:
-                continue
+        remaining = [p for p in sorted(files) if p not in chosen]
+        # A repository that fits keeps plain path order, so small projects see
+        # exactly the prompt they always did. One that does not fit spends the
+        # budget on what is most likely to matter, instead of on whatever sorts
+        # first -- which in a real project is .github/, changelog/ and doc/.
+        if used + sum(len(files[p]) for p in remaining) > budget_chars:
+            remaining = rank_paths(remaining, anchors=list(chosen))
+        for path in remaining:
             body = files[path]
             if used + len(body) > budget_chars:
                 continue
             chosen[path] = body
             used += len(body)
     return chosen
+
+
+DOC_SUFFIXES = {".md", ".rst", ".txt", ".html", ".css", ""}
+DOC_DIRS = ("doc/", "docs/", "changelog/", "changes/", "examples/", "benchmarks/", "bench/", ".github/")
+
+
+def _is_doc(path: str) -> bool:
+    return Path(path).suffix.lower() in DOC_SUFFIXES or path.startswith(DOC_DIRS)
+
+
+def _is_test(path: str) -> bool:
+    name = Path(path).name
+    return name.startswith("test_") or name.endswith("_test.py") or name == "conftest.py" or any(
+        part in {"tests", "testing", "test"} for part in Path(path).parts[:-1]
+    )
+
+
+def rank_paths(paths: list[str], anchors: list[str] | tuple[str, ...] = ()) -> list[str]:
+    """Most useful first: code near the anchors, other source, tests, then docs."""
+    homes = {Path(a).parent for a in anchors}
+
+    def near(path: str) -> bool:
+        parent = Path(path).parent
+        return any(parent == home or home in parent.parents for home in homes if str(home) != ".")
+
+    return sorted(paths, key=lambda p: (_is_doc(p), not near(p), _is_test(p), len(Path(p).parts), p))
+
+
+def file_index(paths, limit: int = 200) -> list[str]:
+    """The repository listing shown to the model: every path when it fits."""
+    ordered = sorted(paths)
+    return ordered if len(ordered) <= limit else rank_paths(ordered)[:limit]
 
 
 def render_context(files: dict[str, str]) -> str:

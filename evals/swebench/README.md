@@ -25,32 +25,45 @@ it is for: both arms get the same instance, models, prompts, budget and tests.
 | What the agent sees | The issue text (`--goal`), the failing output, and the source |
 | What it may not do | Edit any file the test patch touches (`--protect`). Such a patch is refused before it reaches the sandbox |
 | Budget | Fan-out 3, 12 nodes, identical for both arms. Linear means one hypothesis at a time with no depth cap, exactly as in [`run_eval.py`](../run_eval.py) |
-| Success | The test files the test patch touches pass **in full**, confirmed by an independent re-check (below) |
+| Success | **SWE-bench's own criterion**: every FAIL_TO_PASS and PASS_TO_PASS test passes, confirmed by an independent re-check (below) |
+
+### Which tests count
+
+SWE-bench scores an instance on the tests it lists — FAIL_TO_PASS and
+PASS_TO_PASS — and ignores the rest of the file, usually because those tests
+fail in its environment too (`requests-1963` has one written for an
+older pytest). Arborist's own objective is a fully green command, so the
+command deselects every unlisted test: "green" then means exactly
+"resolved", and the agent is never asked to repair what the benchmark
+ignores. Ids are mapped between SWE-bench's node ids and the names pytest
+writes into JUnit, with prefix matching for ids the dataset cut short at a
+space inside a parameter.
 
 ### Validation — before any model is called
 
 An instance whose environment is broken would be scored as an agent failure.
 So every instance is first run twice in the sandbox, with no model involved:
 
-1. with the test patch only — the test files must **fail**;
-2. with the test patch and the reference fix — they must **pass in full**.
+1. with the test patch only — at least one FAIL_TO_PASS test must **fail**;
+2. with the test patch and the reference fix — every listed test must **pass**.
 
 An instance failing either check is excluded, and listed in
-`validation.json` with the reason. The reference fix is used for nothing
-else; the agent never sees it.
+`validation.json` with the reason, together with the exact command it was
+validated with — which is the command the agent then runs against. The
+reference fix is used for nothing else; the agent never sees it.
 
 ### The independent re-check
 
 A search reporting green is not taken on trust. The diff it reports is applied
 with `git apply` to a clean checkout, uploaded to a *fresh* checkpoint of the
-official image with the test patch, and the test files run again. A solve
-counts only if that passes. This also tests the diff itself: a patch that the
+official image with the test patch, and the validated command runs again. A
+solve counts only if that passes. This also tests the diff itself: a patch the
 search evaluated but that does not survive `git apply` would be useless as a
 pull request, and is counted as a failure.
 
-"Test files pass in full" is at least as strict as SWE-bench's own criterion
-(every FAIL_TO_PASS and PASS_TO_PASS test passes), since those tests are a
-subset of the files, and validation guarantees the reference fix meets it.
+The image already holds the project at `/testbed`, so only the files the test
+patch touches are uploaded before the search (`RunConfig.upload_only`); the
+model still reads the whole local checkout.
 
 ## Running it
 

@@ -7,9 +7,11 @@ from arborist.repo import (
     PatchError,
     apply_edits,
     changed_files,
+    file_index,
     is_protected,
     parse_junit,
     parse_pytest_text,
+    rank_paths,
     select_context,
     text_files,
     unified_diff,
@@ -347,3 +349,47 @@ def test_only_python_is_minimised():
     after = "a: 1\n\nb: 2\n"
     out = apply_edits({"conf.yaml": before}, [Edit(path="conf.yaml", new_content=after)])
     assert out["conf.yaml"] == after
+
+
+# --------------------------------------------------------------------------- #
+# context on repositories larger than the budget
+# --------------------------------------------------------------------------- #
+
+BIG = {
+    ".github/workflows/ci.yml": "x" * 40,
+    "changelog/123.bugfix.rst": "y" * 40,
+    "doc/en/index.rst": "z" * 40,
+    "src/pkg/core.py": "a" * 40,
+    "src/pkg/skipping.py": "b" * 40,
+    "src/other/util.py": "c" * 40,
+    "testing/test_skipping.py": "d" * 40,
+}
+
+
+def test_a_repository_that_fits_keeps_plain_path_order():
+    """Small projects -- every eval case -- must see exactly the prompt they always did."""
+    chosen = select_context(BIG, ["src/pkg/skipping.py"], budget_chars=10_000)
+    assert list(chosen) == ["src/pkg/skipping.py"] + sorted(p for p in BIG if p != "src/pkg/skipping.py")
+
+
+def test_a_repository_that_does_not_fit_spends_the_budget_on_code_first():
+    chosen = select_context(BIG, ["src/pkg/skipping.py"], budget_chars=40 * 4)
+    assert list(chosen) == ["src/pkg/skipping.py", "src/pkg/core.py", "src/other/util.py", "testing/test_skipping.py"]
+
+
+def test_ranking_puts_neighbours_first_and_docs_last():
+    ranked = rank_paths(list(BIG), anchors=["src/pkg/skipping.py"])
+    assert ranked[:2] == ["src/pkg/core.py", "src/pkg/skipping.py"]
+    assert set(ranked[-3:]) == {".github/workflows/ci.yml", "changelog/123.bugfix.rst", "doc/en/index.rst"}
+
+
+def test_the_file_index_lists_code_before_docs_when_it_must_be_cut():
+    assert file_index(BIG, limit=10) == sorted(BIG), "everything fits: plain order"
+    cut = file_index(BIG, limit=3)
+    assert all(p.startswith("src/") for p in cut)
+
+
+def test_a_wanted_dotfile_is_found():
+    files = {".coveragerc": "[run]\n", "coveragerc": "decoy\n"}
+    assert list(select_context(files, [".coveragerc"], fill=False)) == [".coveragerc"]
+

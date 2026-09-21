@@ -11,7 +11,8 @@ def round_money(amount: float) -> float:
     Half-cent amounts must round away from zero, the way an invoice reader
     expects: 2.675 -> 2.68, not 2.67.
     """
-    return round(amount, 2)
+    from decimal import Decimal, ROUND_HALF_UP
+    return float(Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
 
 
 def pct(value: float, percent: float) -> float:

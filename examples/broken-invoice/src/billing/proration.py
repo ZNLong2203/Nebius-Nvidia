@@ -11,7 +11,7 @@ def billed_days(start: date, end: date) -> int:
     Both endpoints are inclusive: a subscription that runs from the 1st to the
     30th is billed for 30 days, not 29.
     """
-    return (end - start).days
+    return (end - start).days + 1
 
 
 def prorate(monthly_price: float, start: date, end: date, days_in_month: int = 30) -> float:

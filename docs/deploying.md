@@ -86,7 +86,7 @@ and expose port 8000. The health check at `/api/health` is already wired.
 |---|---|
 | `repo_path` is a **server-side path** | Restrict it to a known set of demo repositories, or leave live runs disabled and serve only recorded ones |
 | A live run costs tokens | Rate limit, or run the public demo with no `NEBIUS_API_KEY` at all |
-| Sandboxes quota | `ARBORIST_MAX_NODES` caps executions per run; lower it for a public instance |
+| Sandboxes quota | `ARBORIST_MAX_NODES` caps nodes per run — every patch, including ones refused before they execute — so it bounds executions too; lower it for a public instance |
 
 The safest public configuration is **no API key**: recorded runs replay in full,
 the tree is fully explorable, and nothing can be spent.

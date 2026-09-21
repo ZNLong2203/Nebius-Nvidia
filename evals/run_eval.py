@@ -99,6 +99,8 @@ class Row:
     tokens_super: int
     tokens_ultra: int
     error: str = ""
+    code: str = ""
+    """The commit this run executed, so a resumed sweep that spans a change says so."""
 
 
 def run_case(
@@ -176,6 +178,7 @@ def run_case(
         tokens_super=tiers.get("super", {}).get("total_tokens", 0),
         tokens_ultra=tiers.get("ultra", {}).get("total_tokens", 0),
         error=result.error,
+        code=code_version(),
     )
 
 
@@ -213,6 +216,14 @@ def code_version() -> str:
     return f"{head}+local changes" if dirty else head
 
 
+def _codes(rows: list[Row]) -> str:
+    """The commit(s) behind a table: one, or every one when a sweep spans several."""
+    codes = sorted({r.code or "unrecorded" for r in rows})
+    if len(codes) == 1:
+        return f"`{codes[0]}`"
+    return "**mixed** (" + ", ".join(f"`{c}`" for c in codes) + " -- see `code` per run in the JSON)"
+
+
 def write_results(rows: list[Row], out: Path, settings, args) -> None:
     """Persist after every run, not at the end.
 
@@ -221,7 +232,7 @@ def write_results(rows: list[Row], out: Path, settings, args) -> None:
     """
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        f"# Eval results\n\ncode: `{code_version()}` · "
+        f"# Eval results\n\ncode: {_codes(rows)} · "
         f"backend: `{settings.backend}` · fanout: {args.fanout} · "
         f"node cap: {args.max_nodes} · models: `{args.model_set}` "
         f"({', '.join(MODEL_SETS[args.model_set].values())}) · "

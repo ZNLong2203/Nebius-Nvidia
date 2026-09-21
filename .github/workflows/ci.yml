@@ -57,11 +57,12 @@ jobs:
         # and directory snapshots for Nebius Sandboxes.
         run: uv run pytest -q
 
-      - name: Build the web UI
+      - name: Test and build the web UI
         if: matrix.python-version == '3.12'
         working-directory: web
         run: |
           npm install --no-audit --no-fund
+          npm test
           npm run build
 
       - name: The bundled fixtures really are broken

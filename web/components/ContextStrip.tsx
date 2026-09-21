@@ -88,6 +88,9 @@ export function ContextStrip({
       {recorded && (
         <span className="text-[12px] text-ink-3">
           Recorded run — a real search that already finished
+          {result.stats?.backend === "contree"
+            ? ` on Nebius Sandboxes, ${result.stats.forks ?? result.stats.sandbox_executions} forked executions`
+            : " on the local backend"}
           {recorded.at ? `, ${new Date(recorded.at * 1000).toLocaleString()}` : ""}.
           {health?.can_run
             ? " Press Run search to start a live one."

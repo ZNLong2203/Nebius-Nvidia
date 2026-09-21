@@ -69,6 +69,8 @@ Repairs the failing suite: 5/9 → 9/9 passing.
 
 Every branch the search explored is in that body, folded away but present, with the test-level reason it lost. A reviewer can see that the agent *considered* weakening the assertion and why that attempt was thrown out. No coding agent ships that today, and it is the difference between trusting a diff and being able to check one.
 
+**A real one: [pull request #1](https://github.com/ZNLong2203/Nebius-Nvidia/pull/1)**, opened by `arborist pr` from the demo run above. Three files, six lines added, four removed — the three fixes and nothing else — and under *Alternatives considered*, the two branches that broke passing tests, each with the tests it broke. It targets a `demo/` branch so the fixture stays broken on `main`.
+
 ---
 
 ## How NVIDIA Nemotron is used

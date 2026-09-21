@@ -73,6 +73,12 @@ class RunConfig:
     protected: list[str] = field(default_factory=list)
     """Glob patterns no patch may edit. Protecting the tests makes "green" mean
     the code was fixed rather than the oracle rewritten."""
+    upload_only: list[str] | None = None
+    """For an image that already holds the repository at the workdir: the only
+    paths to write into it before the search starts. The model still reads the
+    whole local copy; the sandbox receives just what differs. Uploading an
+    entire project to overwrite identical files is slow, and on large trees
+    the burst of uploads times out."""
 
     @property
     def instrumented_test_command(self) -> str:
@@ -256,7 +262,10 @@ class Arborist:
         raw_files = load_repo(cfg.repo_path)
         sources = text_files(raw_files)
 
-        base_cp = self.backend.base(raw_files, cfg.image)
+        upload = raw_files
+        if cfg.upload_only is not None:
+            upload = {p: raw_files[p] for p in cfg.upload_only if p in raw_files}
+        base_cp = self.backend.base(upload, cfg.image)
         self._emit("checkpoint", stage="base", checkpoint=base_cp.id)
 
         # The expensive prefix, paid exactly once for the entire search.

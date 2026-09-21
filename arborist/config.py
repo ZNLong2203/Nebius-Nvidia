@@ -9,8 +9,13 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
+# Neither call overrides a variable that is already set, so precedence is: the
+# real environment, then the .env of the directory you run from (a CLI should
+# read the project it is pointed at, including when installed with pipx), then
+# the .env of the checkout Arborist itself runs from.
+load_dotenv(find_dotenv(usecwd=True))
 load_dotenv()
 
 # Nemotron tiers on Nebius Token Factory. The whole point of the three-tier

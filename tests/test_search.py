@@ -570,3 +570,30 @@ def test_without_a_goal_the_prompts_are_unchanged(backend):
     Arborist(settings, backend, llm).run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
     assert all(not user.startswith("TASK") for _tier, user in llm.calls)
 
+
+
+class _RecordingBackend(LocalBackend):
+    """A local backend that remembers what it was asked to upload at the start."""
+
+    def base(self, files, image):
+        self.seeded = dict(files)
+        return super().base(files, image)
+
+
+def test_upload_only_seeds_just_the_named_paths(tmp_path):
+    """For images that already hold the project: the rest is not re-sent."""
+    backend = _RecordingBackend(root=tmp_path / "sandbox")
+    llm = ScriptedLLM(responses={"super": [_diagnosis("t", "src/billing/money.py")], "nano": []})
+    settings = load_settings(backend="local", fanout=1, max_nodes=1, max_depth=1)
+    Arborist(settings, backend, llm).run(
+        RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD, upload_only=["tests/test_billing.py"])
+    )
+    assert list(backend.seeded) == ["tests/test_billing.py"]
+
+
+def test_by_default_the_whole_repository_is_seeded(tmp_path):
+    backend = _RecordingBackend(root=tmp_path / "sandbox")
+    llm = ScriptedLLM(responses={"super": [_diagnosis("t", "src/billing/money.py")], "nano": []})
+    settings = load_settings(backend="local", fanout=1, max_nodes=1, max_depth=1)
+    Arborist(settings, backend, llm).run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
+    assert "src/billing/money.py" in backend.seeded and "tests/test_billing.py" in backend.seeded

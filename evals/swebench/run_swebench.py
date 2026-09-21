@@ -466,9 +466,21 @@ def write(rows: list[Row], out: Path) -> None:
     out.write_text(markdown(rows))
 
 
+def code_version() -> str:
+    """The commit the numbers came from, marked when the tree had local changes."""
+    try:
+        head = _git(ROOT, "rev-parse", "--short", "HEAD").strip()
+        dirty = _git(ROOT, "status", "--porcelain", "--untracked-files=no").strip()
+    except (OSError, RuntimeError):
+        return "unknown"
+    return f"{head}+local changes" if dirty else head
+
+
 def markdown(rows: list[Row]) -> str:
     lines = [
         "# SWE-bench Lite on Nebius Sandboxes",
+        "",
+        f"code: `{code_version()}`",
         "",
         "Test-driven setting: the agent sees the issue **and** the failing tests, which are",
         "protected from edits. Not comparable to the SWE-bench leaderboard. Method and",

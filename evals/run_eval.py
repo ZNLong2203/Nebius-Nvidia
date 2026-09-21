@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass
@@ -194,6 +195,24 @@ def markdown(rows: list[Row]) -> str:
     return head + body
 
 
+def code_version() -> str:
+    """The commit the numbers came from, marked when the tree had local changes.
+
+    A table without it cannot be traced back to the code that produced it, and
+    this project changes the search between sweeps.
+    """
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT, capture_output=True, text=True
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return f"{head}+local changes" if dirty else head
+
+
 def write_results(rows: list[Row], out: Path, settings, args) -> None:
     """Persist after every run, not at the end.
 
@@ -202,7 +221,8 @@ def write_results(rows: list[Row], out: Path, settings, args) -> None:
     """
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(
-        f"# Eval results\n\nbackend: `{settings.backend}` · fanout: {args.fanout} · "
+        f"# Eval results\n\ncode: `{code_version()}` · "
+        f"backend: `{settings.backend}` · fanout: {args.fanout} · "
         f"node cap: {args.max_nodes} · models: `{args.model_set}` "
         f"({', '.join(MODEL_SETS[args.model_set].values())}) · "
         f"{args.repeat} run(s) per configuration\n\n"

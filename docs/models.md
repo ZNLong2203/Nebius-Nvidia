@@ -11,7 +11,7 @@ at `https://api.tokenfactory.nebius.com/v1/`. Implemented in
 |---|---|---|---|
 | `nano` | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | **k** (one per candidate patch) | Write one minimal patch for one assigned hypothesis |
 | `super` | `nvidia/nemotron-3-super-120b-a12b` | 1 | Diagnose the failure, produce *distinct* hypotheses |
-| `ultra` | `nvidia/Nemotron-3-Ultra-550b-a55b` | 0 in the normal case | Escalated diagnosis when stalled; tie adjudication |
+| `ultra` | `nvidia/Nemotron-3-Ultra-550b-a55b` | 0 while the search makes progress; every diagnosis while it is stalled | Escalated diagnosis when stalled; tie adjudication |
 
 > **The ids are case-sensitive**, and the lowercase slugs used by model
 > aggregators 404 here. `GET /v1/models` on your own account is the source of
@@ -37,7 +37,11 @@ Two triggers, both earned rather than scheduled.
 
 **Stall.** Two consecutive expansions with no improvement in the best score
 (`STALL_LIMIT = 2`) escalate the next diagnosis from Super to Ultra. Any
-improvement resets the counter.
+improvement resets the counter. Until then **every** diagnosis stays on Ultra, which is what makes this
+the expensive path: in the final measurement a linear search, which stalls far
+more often, made 196 Ultra calls across 35 runs against branching's 29, and
+Ultra was 68% of the $8.77 the measurement cost. `ARBORIST_MAX_COST` (default
+$2) bounds what any one run can spend.
 
 **Tie.** If the run ends without a green node and the leading branches are within
 `TIE_EPSILON` of each other, Ultra adjudicates.

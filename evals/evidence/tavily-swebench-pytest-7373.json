@@ -1,0 +1,259 @@
+{
+  "run_id": "run-5c122ec8",
+  "solved": true,
+  "winner_id": "n-350be348",
+  "diff": "--- a/src/_pytest/mark/evaluate.py\n+++ b/src/_pytest/mark/evaluate.py\n@@ -18,9 +18,9 @@\n evalcache_key = StoreKey[Dict[str, Any]]()\n \n \n-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\n-    default = {}  # type: Dict[str, object]\n-    evalcache = config._store.setdefault(evalcache_key, default)\n+def cached_eval(item: Item, expr: str, d: Dict[str, object]) -> Any:\n+    # use item's _evalcache, create if not exists\n+    evalcache = getattr(item, \"_evalcache\", {})\n     try:\n         return evalcache[expr]\n     except KeyError:\n@@ -98,7 +98,7 @@\n                     self.expr = expr\n                     if isinstance(expr, str):\n                         d = self._getglobals()\n-                        result = cached_eval(self.item.config, expr, d)\n+                        result = cached_eval(self.item, expr, d)\n                     else:\n                         if \"reason\" not in mark.kwargs:\n                             # XXX better be checked at collection time\n--- a/src/_pytest/nodes.py\n+++ b/src/_pytest/nodes.py\n@@ -623,6 +623,7 @@\n         nodeid: Optional[str] = None,\n     ) -> None:\n         super().__init__(name, parent, config, session, nodeid=nodeid)\n+        self._evalcache = {}\n         self._report_sections = []  # type: List[Tuple[str, str, str]]\n \n         #: user properties is a list of tuples (name, value) that holds user\n",
+  "baseline": {
+    "total": 91,
+    "passed": 90,
+    "failed": 1,
+    "errors": 0,
+    "skipped": 0,
+    "failed_ids": [
+      "testing.test_mark.TestFunctional::test_reevaluate_dynamic_expr"
+    ],
+    "collection_error": false,
+    "green": false
+  },
+  "final": {
+    "total": 91,
+    "passed": 91,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "failed_ids": [],
+    "collection_error": false,
+    "green": true
+  },
+  "nodes": [
+    {
+      "id": "n-5a540978",
+      "parent_id": null,
+      "depth": 0,
+      "checkpoint_id": "0e9c414e-56a5-4105-9334-257ff5ed499b",
+      "hypothesis": null,
+      "diagnosis": "",
+      "edits": [],
+      "explanation": "",
+      "report": {
+        "total": 91,
+        "passed": 90,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "failed_ids": [
+          "testing.test_mark.TestFunctional::test_reevaluate_dynamic_expr"
+        ],
+        "collection_error": false,
+        "green": false
+      },
+      "score": 0.989,
+      "status": "failed",
+      "regressions": [],
+      "fixed": [],
+      "stdout_tail": "...........................F............................................ [ 79%]\n...................                                                      [100%]\n=================================== FAILURES ===================================\n_________________ TestFunctional.test_reevaluate_dynamic_expr __________________\n\nself = <test_mark.TestFunctional object at 0x7ffff629fd90>\ntestdir = <Testdir local('/tmp/pytest-of-root/pytest-0/test_reevaluate_dynamic_expr0')>\n\n    def test_reevaluate_dynamic_expr(self, testdir):\n        \"\"\"#7360\"\"\"\n        py_file1 = testdir.makepyfile(\n            test_reevaluate_dynamic_expr1=\"\"\"\n            import pytest\n    \n            skip = True\n    \n            @pytest.mark.skipif(\"skip\")\n            def test_should_skip():\n                assert True\n        \"\"\"\n        )\n        py_file2 = testdir.makepyfile(\n            test_reevaluate_dynamic_expr2=\"\"\"\n            import pytest\n    \n            skip = False\n    \n            @pytest.mark.skipif(\"skip\")\n            def test_should_not_skip():\n                assert True\n        \"\"\"\n        )\n    \n        file_name1 = os.path.basename(py_file1.strpath)\n        file_name2 = os.path.basename(py_file2.strpath)\n        reprec = testdir.inline_run(file_name1, file_name2)\n>       reprec.assertoutcome(passed=1, skipped=1)\nE       AssertionError: ([], [<TestReport 'test_reevaluate_dynamic_expr1.py::test_should_skip' when='setup' outcome='skipped'>, <TestReport 'test_reevaluate_dynamic_expr2.py::test_should_not_skip' when='setup' outcome='skipped'>], [])\nE       assert {'failed': 0,... 'skipped': 2} == {'failed': 0,... 'skipped': 1}\nE         Omitting 1 identical items, use -vv to show\nE         Differing items:\nE         {'passed': 0} != {'passed': 1}\nE         {'skipped': 2} != {'skipped': 1}\nE         Full diff:\nE         - {'failed': 0, 'passed': 1, 'skipped': 1}\nE         ?                         ^             ^...\nE         \nE         ...Full output truncated (3 lines hidden), use '-vv' to show\n\n/testbed/testing/test_mark.py:737: AssertionError\n----------------------------- Captured stdout call -----------------------------\n============================= test session starts ==============================\nplatform linux -- Python 3.9.20, pytest-5.4.1.dev522+g7b77fc086.d20260815, py-1.11.0, pluggy-0.13.1\nrootdir: /tmp/pytest-of-root/pytest-0/test_reevaluate_dynamic_expr0\ncollected 2 items\n\ntest_reevaluate_dynamic_expr1.py s                                       [ 50%]\ntest_reevaluate_dynamic_expr2.py s                                       [100%]\n\n============================== 2 skipped in 0.01s ==============================\n=============================== warnings summary ===============================\nsrc/_pytest/junitxml.py:435\n  /testbed/src/_pytest/junitxml.py:435: PytestDeprecationWarning: The 'junit_family' default value will change to 'xunit2' in pytest 6.0. See:\n    https://docs.pytest.org/en/latest/deprecations.html#junit-family-default-value-change-to-xunit2\n  for more information.\n    _issue_warning_captured(deprecated.JUNIT_XML_DEFAULT_FAMILY, config.hook, 2)\n\n-- Docs: https://docs.pytest.org/en/latest/warnings.html\n-------------- generated xml file: /testbed/.arborist/report.xml ---------------\n=========================== short test summary info ============================\nFAILED testing/test_mark.py::TestFunctional::test_reevaluate_dynamic_expr - A...\n1 failed, 90 passed, 1 warning in 2.14s\n",
+      "model_tier": "",
+      "wall_seconds": 0.0,
+      "expanded": true,
+      "expansions": 1,
+      "note": "baseline"
+    },
+    {
+      "id": "n-c5d14088",
+      "parent_id": "n-5a540978",
+      "depth": 1,
+      "checkpoint_id": "0e041f1c-156b-4564-b386-830ba6354aed",
+      "hypothesis": {
+        "id": "h-bc344b2a",
+        "title": "Include evaluation context in cache key",
+        "rationale": "The cache in _pytest/mark/evaluate.py uses only the expression string as the key. This causes the same string expression evaluated in different modules (with different global variables) to return the cached result from the first evaluation. Including the evaluation context (e.g., a hash of the item's globals) in the cache key would prevent cross-module interference.",
+        "target_files": [
+          "src/_pytest/mark/evaluate.py"
+        ],
+        "strategy": "Modify cached_eval to use a cache key that combines the expression string and a hash of the item's globals (or the item itself) to ensure evaluations in different contexts are cached separately."
+      },
+      "diagnosis": "The test failure is due to incorrect caching of the evaluation of string conditions in skipif/xfail markers. The caching mechanism does not account for the evaluation context (globals), leading to the same condition string being evaluated incorrectly when used in different modules with different variable values.",
+      "edits": [
+        {
+          "path": "src/_pytest/mark/evaluate.py",
+          "search": "    try:\n        return evalcache[expr]\n    except KeyError:\n        import _pytest._code\n\n        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n        evalcache[expr] = x = eval(exprcode, d)\n        return x",
+          "replace": "    try:\n        # Use a context-sensitive cache key that includes the expression and a snapshot of the evaluation globals\n        context_key = (expr, frozenset(d.items()))\n        return evalcache[context_key]\n    except KeyError:\n        import _pytest._code\n\n        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n        evalcache[context_key] = x = eval(exprcode, d)\n        return x",
+          "new_content": null
+        }
+      ],
+      "explanation": "Modify cached_eval to use a context-sensitive cache key that incorporates the expression and a snapshot of the evaluation globals, preventing cross-module interference.",
+      "report": {
+        "total": 91,
+        "passed": 90,
+        "failed": 1,
+        "errors": 0,
+        "skipped": 0,
+        "failed_ids": [
+          "testing.test_mark.TestFunctional::test_reevaluate_dynamic_expr"
+        ],
+        "collection_error": false,
+        "green": false
+      },
+      "score": 0.989,
+      "status": "neutral",
+      "regressions": [],
+      "fixed": [],
+      "stdout_tail": "__________ TestFunctional.test_reevaluate_dynamic_expr __________________\n\nself = <test_mark.TestFunctional object at 0x7ffff6098eb0>\ntestdir = <Testdir local('/tmp/pytest-of-root/pytest-1/test_reevaluate_dynamic_expr0')>\n\n    def test_reevaluate_dynamic_expr(self, testdir):\n        \"\"\"#7360\"\"\"\n        py_file1 = testdir.makepyfile(\n            test_reevaluate_dynamic_expr1=\"\"\"\n            import pytest\n    \n            skip = True\n    \n            @pytest.mark.skipif(\"skip\")\n            def test_should_skip():\n                assert True\n        \"\"\"\n        )\n        py_file2 = testdir.makepyfile(\n            test_reevaluate_dynamic_expr2=\"\"\"\n            import pytest\n    \n            skip = False\n    \n            @pytest.mark.skipif(\"skip\")\n            def test_should_not_skip():\n                assert True\n        \"\"\"\n        )\n    \n        file_name1 = os.path.basename(py_file1.strpath)\n        file_name2 = os.path.basename(py_file2.strpath)\n        reprec = testdir.inline_run(file_name1, file_name2)\n>       reprec.assertoutcome(passed=1, skipped=1)\nE       AssertionError: ([], [], [<TestReport 'test_reevaluate_dynamic_expr1.py::test_should_skip' when='setup' outcome='failed'>, <TestReport 'test_reevaluate_dynamic_expr2.py::test_should_not_skip' when='setup' outcome='failed'>])\nE       assert {'failed': 2,... 'skipped': 0} == {'failed': 0,... 'skipped': 1}\nE         Differing items:\nE         {'skipped': 0} != {'skipped': 1}\nE         {'passed': 0} != {'passed': 1}\nE         {'failed': 2} != {'failed': 0}\nE         Full diff:\nE         - {'failed': 0, 'passed': 1, 'skipped': 1}\nE         ?            ^            ^             ^...\nE         \nE         ...Full output truncated (3 lines hidden), use '-vv' to show\n\n/testbed/testing/test_mark.py:737: AssertionError\n----------------------------- Captured stdout call -----------------------------\n============================= test session starts ==============================\nplatform linux -- Python 3.9.20, pytest-5.4.1.dev522+g7b77fc086.d20260815, py-1.11.0, pluggy-0.13.1\nrootdir: /tmp/pytest-of-root/pytest-1/test_reevaluate_dynamic_expr0\ncollected 2 items\n\ntest_reevaluate_dynamic_expr1.py E                                       [ 50%]\ntest_reevaluate_dynamic_expr2.py E                                       [100%]\n\n==================================== ERRORS ====================================\n______________________ ERROR at setup of test_should_skip ______________________\nunhashable type: 'ModuleSpec'\n\nDuring handling of the above exception, another exception occurred:\nError evaluating 'skipif' expression\n    skip\nTypeError: unhashable type: 'ModuleSpec'\n____________________ ERROR at setup of test_should_not_skip ____________________\nunhashable type: 'ModuleSpec'\n\nDuring handling of the above exception, another exception occurred:\nError evaluating 'skipif' expression\n    skip\nTypeError: unhashable type: 'ModuleSpec'\n=========================== short test summary info ============================\nERROR test_reevaluate_dynamic_expr1.py::test_should_skip\nERROR test_reevaluate_dynamic_expr2.py::test_should_not_skip\n============================== 2 errors in 0.01s ===============================\n=============================== warnings summary ===============================\nsrc/_pytest/junitxml.py:435\n  /testbed/src/_pytest/junitxml.py:435: PytestDeprecationWarning: The 'junit_family' default value will change to 'xunit2' in pytest 6.0. See:\n    https://docs.pytest.org/en/latest/deprecations.html#junit-family-default-value-change-to-xunit2\n  for more information.\n    _issue_warning_captured(deprecated.JUNIT_XML_DEFAULT_FAMILY, config.hook, 2)\n\n-- Docs: https://docs.pytest.org/en/latest/warnings.html\n-------------- generated xml file: /testbed/.arborist/report.xml ---------------\n=========================== short test summary info ============================\nFAILED testing/test_mark.py::TestFunctional::test_reevaluate_dynamic_expr - A...\n1 failed, 90 passed, 1 warning in 2.26s\n",
+      "model_tier": "nano",
+      "wall_seconds": 41.57,
+      "expanded": false,
+      "expansions": 0,
+      "note": ""
+    },
+    {
+      "id": "n-873dc754",
+      "parent_id": "n-5a540978",
+      "depth": 1,
+      "checkpoint_id": null,
+      "hypothesis": {
+        "id": "h-123b194d",
+        "title": "Remove caching in cached_eval",
+        "rationale": "The failure shows that two tests in different modules with the same condition string 'skip' (one True, one False) are both skipped. This indicates that the result from the first module (skip=True) is being reused for the second module (skip=False). The task description identifies the caching in _pytest/mark/evaluate.py as the cause. Removing the caching ensures each evaluation uses the current module's globals.",
+        "target_files": [
+          "src/_pytest/mark/evaluate.py"
+        ],
+        "strategy": "Inline the evaluation logic from cached_eval into MarkEvaluator._istrue and remove the caching mechanism."
+      },
+      "diagnosis": "The test failure is due to incorrect caching of the evaluation of string conditions in skipif/xfail markers. The caching mechanism does not account for the evaluation context (globals), leading to the same condition string being evaluated incorrectly when used in different modules with different variable values.",
+      "edits": [
+        {
+          "path": "src/_pytest/mark/evaluate.py",
+          "search": "def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\\n    default = {}  # type: Dict[str, object]\\n    evalcache = config._store.setdefault(evalcache_key, default)\\n    try:\\n        return evalcache[expr]\\n    except KeyError:\\n        import _pytest._code\\n\\n        exprcode = _pytest._code.compile(expr, mode=\\\"eval\\\")\\n        evalcache[expr] = x = eval(exprcode, d)\\n        return x",
+          "replace": "",
+          "new_content": null
+        },
+        {
+          "path": "src/_pytest/mark/evaluate.py",
+          "search": "                    if isinstance(expr, str):\\n                        d = self._getglobals()\\n                        result = cached_eval(self.item.config, expr, d)\\n",
+          "replace": "                    if isinstance(expr, str):\\n                        d = self._getglobals()\\n                        result = eval(expr, d)\\n",
+          "new_content": null
+        }
+      ],
+      "explanation": "Remove caching in cached_eval by deleting the cached_eval function and inlining eval in MarkEvaluator._istrue to use direct eval with module globals, eliminating stale cached results.",
+      "report": null,
+      "score": 0.0,
+      "status": "invalid",
+      "regressions": [],
+      "fixed": [],
+      "stdout_tail": "",
+      "model_tier": "nano",
+      "wall_seconds": 97.39,
+      "expanded": false,
+      "expansions": 0,
+      "note": "src/_pytest/mark/evaluate.py: search block not found (retry: src/_pytest/mark/evaluate.py: search block not found)"
+    },
+    {
+      "id": "n-350be348",
+      "parent_id": "n-5a540978",
+      "depth": 1,
+      "checkpoint_id": "3e1d967c-ca81-433d-a2fa-3b8cb4786597",
+      "hypothesis": {
+        "id": "h-54ef7691",
+        "title": "Scope cache to item level",
+        "rationale": "The cache is currently stored at the config level (config._evalcache) and shared across all test items. This allows the evaluation result from one item to affect another item in a different module. Scoping the cache to the item (e.g., storing it on the item) would ensure each item has its own cache and evaluations do not interfere across items.",
+        "target_files": [
+          "src/_pytest/mark/evaluate.py",
+          "src/_pytest/nodes.py"
+        ],
+        "strategy": "Move the cache from the config to the item object (e.g., add an _evalcache attribute to the item class) and modify MarkEvaluator to use the item's cache instead of the config's cache."
+      },
+      "diagnosis": "The test failure is due to incorrect caching of the evaluation of string conditions in skipif/xfail markers. The caching mechanism does not account for the evaluation context (globals), leading to the same condition string being evaluated incorrectly when used in different modules with different variable values.",
+      "edits": [
+        {
+          "path": "src/_pytest/mark/evaluate.py",
+          "search": "def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\n    default = {}  # type: Dict[str, object]\n    evalcache = config._store.setdefault(evalcache_key, default)\n    try:\n        return evalcache[expr]\n    except KeyError:\n        import _pytest._code\n\n        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n        evalcache[expr] = x = eval(exprcode, d)\n        return x",
+          "replace": "def cached_eval(item: Item, expr: str, d: Dict[str, object]) -> Any:\n    # use item's _evalcache, create if not exists\n    evalcache = getattr(item, \"_evalcache\", {})\n    try:\n        return evalcache[expr]\n    except KeyError:\n        import _pytest._code\n\n        exprcode = _pytest._code.compile(expr, mode=\"eval\")\n        evalcache[expr] = x = eval(exprcode, d)\n        return x",
+          "new_content": null
+        },
+        {
+          "path": "src/_pytest/mark/evaluate.py",
+          "search": "                    if isinstance(expr, str):\n                        d = self._getglobals()\n                        result = cached_eval(self.item.config, expr, d)",
+          "replace": "                    if isinstance(expr, str):\n                        d = self._getglobals()\n                        result = cached_eval(self.item, expr, d)",
+          "new_content": null
+        },
+        {
+          "path": "src/_pytest/nodes.py",
+          "search": "        super().__init__(name, parent, config, session, nodeid=nodeid)",
+          "replace": "        super().__init__(name, parent, config, session, nodeid=nodeid)\n        self._evalcache = {}",
+          "new_content": null
+        }
+      ],
+      "explanation": "The caching of string expressions in skipif/xfail markers is currently stored in a config-level cache, causing evaluations from one test item to affect another. The fix scopes the cache to each Item by adding an _evalcache attribute and using it instead of the shared config cache.",
+      "report": {
+        "total": 91,
+        "passed": 91,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0,
+        "failed_ids": [],
+        "collection_error": false,
+        "green": true
+      },
+      "score": 1.0,
+      "status": "green",
+      "regressions": [],
+      "fixed": [
+        "testing.test_mark.TestFunctional::test_reevaluate_dynamic_expr"
+      ],
+      "stdout_tail": "........................................................................ [ 79%]\n...................                                                      [100%]\n=============================== warnings summary ===============================\nsrc/_pytest/junitxml.py:435\n  /testbed/src/_pytest/junitxml.py:435: PytestDeprecationWarning: The 'junit_family' default value will change to 'xunit2' in pytest 6.0. See:\n    https://docs.pytest.org/en/latest/deprecations.html#junit-family-default-value-change-to-xunit2\n  for more information.\n    _issue_warning_captured(deprecated.JUNIT_XML_DEFAULT_FAMILY, config.hook, 2)\n\n-- Docs: https://docs.pytest.org/en/latest/warnings.html\n-------------- generated xml file: /testbed/.arborist/report.xml ---------------\n91 passed, 1 warning in 2.10s\n",
+      "model_tier": "nano",
+      "wall_seconds": 130.07,
+      "expanded": false,
+      "expansions": 0,
+      "note": "applied on retry after: src/_pytest/nodes.py: search block not found"
+    }
+  ],
+  "stats": {
+    "backend": "contree",
+    "branching": true,
+    "wall_seconds": 181.04,
+    "sandbox_executions": 3,
+    "sandbox_seconds": 13.54,
+    "setup_seconds": 0.0,
+    "setup_runs": 0,
+    "setup_seconds_saved": 0.0,
+    "nodes": 4,
+    "cancelled": false,
+    "patches_evaluated": 3,
+    "invalid_patches": 1,
+    "forks": 3,
+    "tavily_queries": [
+      "pytest cached_eval _pytest/mark/evaluate.py"
+    ]
+  },
+  "usage": {
+    "by_tier": {
+      "nano": {
+        "calls": 5,
+        "prompt_tokens": 173427,
+        "completion_tokens": 23486,
+        "total_tokens": 196913
+      },
+      "super": {
+        "calls": 2,
+        "prompt_tokens": 42094,
+        "completion_tokens": 6971,
+        "total_tokens": 49065
+      },
+      "ultra": {
+        "calls": 0,
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "total_tokens": 0
+      }
+    },
+    "models": {
+      "nano": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+      "super": "nvidia/nemotron-3-super-120b-a12b",
+      "ultra": "nvidia/Nemotron-3-Ultra-550b-a55b"
+    },
+    "total_tokens": 245978,
+    "budget": 1500000
+  },
+  "error": ""
+}

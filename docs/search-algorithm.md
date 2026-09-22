@@ -58,8 +58,9 @@ tier = "ultra" if self._stalls >= STALL_LIMIT else "super"   # STALL_LIMIT = 2
 ```
 
 A *stall* is an expansion that produced no new best score. Two in a row means the
-cheaper model has stopped making progress, so the next diagnosis is escalated.
-Any improvement resets the counter.
+cheaper model has stopped making progress, so diagnoses are escalated — every one
+of them, until an improvement resets the counter. That is the costly case; see
+[models.md](models.md) for what it cost in the measurement.
 
 The prompt asks for **distinct** hypotheses, and is given `parent_attempts` —
 what this branch already tried and how it went — so expansions do not loop.

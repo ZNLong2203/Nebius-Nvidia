@@ -81,7 +81,7 @@ Three tiers, chosen by what each step is worth. This is the core cost argument, 
 |---|---|---|---|
 | **Nano** | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B` | Once **per candidate patch** — the widest step in the whole system | Most branches are thrown away. The work that gets discarded must be the cheap work. |
 | **Super** | `nvidia/nemotron-3-super-120b-a12b` | Once **per node**, to diagnose the failure and produce *distinct* hypotheses worth branching on | This is the reasoning that shapes the search. Getting hypotheses that genuinely differ is what makes breadth worth paying for. |
-| **Ultra** | `nvidia/Nemotron-3-Ultra-550b-a55b` | Only when the search **stalls** (two expansions with no improvement), or when two branches score **identically** | Expensive, so it is earned, not scheduled. |
+| **Ultra** | `nvidia/Nemotron-3-Ultra-550b-a55b` | When the search **stalls** (two expansions with no improvement) — and for every diagnosis after that until something improves — or when two branches score **identically** | Expensive, so it is earned, not scheduled. A search that keeps making progress barely touches it: 29 Ultra calls across 35 branching runs, against 196 in the 35 linear runs. |
 
 The Ultra tie-break is the interesting one. When the tests cannot separate two branches, the suite has stopped being informative — and that is exactly the situation where one of the patches is *gaming* it. Ultra is asked specifically to catch a patch that passes by weakening an assertion, swallowing an exception, or special-casing the test input, and to flag it rather than let the score stand. See [`arborist/agent.py`](arborist/agent.py) (`ADJUDICATE_SYSTEM`).
 
@@ -194,7 +194,7 @@ Same models, same prompts, same budget — one hypothesis at a time, and no chec
 python evals/run_eval.py --cases all
 ```
 
-Runs every case twice under an identical budget, branching on and off, and writes `evals/results.md` with: solved yes/no, tests passing before and after, patches evaluated, sandbox executions, **how many times setup had to run**, invalid patches, wall time, and tokens per tier.
+Runs every case under an identical budget, branching on and off (`--repeat N` for more runs), and writes `evals/results.md` with: solved yes/no, tests passing before and after, patches evaluated, sandbox executions, **how many times setup had to run**, invalid patches, wall time, and tokens per tier.
 
 Four cases ship: the bundled example and three in `evals/cases`. The answer keys live in [`evals/README.md`](evals/README.md),
 never inside a case — anything inside is loaded into the agent's context, and a
@@ -205,63 +205,82 @@ models from the same Token Factory account (Qwen3 30B A3B against Nemotron 3
 Nano 30B A3B, gpt-oss 120B against Super), so a model comparison changes the
 model and nothing else.
 
-### What the numbers actually show
+### What the numbers show
 
-> **Being re-measured on Nebius Sandboxes.** The numbers in this section come
-> from the local backend. Since then two more fixes have landed, and like the
-> three before them both favoured the branching arm: a fruitless expansion
-> ended a linear run outright, and a linear run got a third of the attempts
-> per state that a branching run did. The full comparison is re-running on
-> Sandboxes with both fixed; its table will replace this one.
+Measured on Nebius Sandboxes by the [Measure workflow](.github/workflows/measure.yml),
+all at one commit (`7b11e3d`), after removing five biases that had each favoured
+branching (listed below). Both arms get the same models, prompts, budget and
+tests — fan-out 3, 12 nodes; linear means one hypothesis at a time.
 
-Two findings, and only one of them is the one this project set out to make.
+**On cases built to need a search, branching wins. On cases one patch solves, it
+does not.** Three runs per configuration ([`evals/results-contree.md`](evals/results-contree.md)):
 
-**Patch application mattered more than the search.** Saving every run's tree
-made the real bottleneck visible: three of five patches never reached the
-sandbox because the model quoted a fragment of a docstring-bearing file slightly
-wrong, and the next expansion repeated the same mistake because a failed patch
-taught the search nothing. Naming short files as whole-file rewrites and giving
-a failed patch one repair attempt with the reason fed back took the invalid rate
-from 3-of-5 to 0-of-8, and turned two unsolved runs into solved ones.
+| case | branching | linear | what the case is |
+|---|---|---|---|
+| `broken-invoice` | **3/3** | 0/3 | three independent bugs in three files |
+| `masked-faults` | **2/3** | 0/3 | a fault hidden behind another; the obvious fix moves nothing |
+| `regression-trap` | 3/3 | 3/3 | one patch solves it |
+| `outside-knowledge` | 3/3 | 3/3 | one patch solves it, once the docs are looked up |
+| **all** | **11/12** | 6/12 | |
 
-**Branching wins only when the case needs a search — and most cases do not.**
+Across those 24 runs, branching ran the environment setup **12 times** — once
+per run — and linear **86 times**; branching spent $0.26 on models, linear $0.67.
 
-On `broken-invoice`, `regression-trap` and `outside-knowledge` the linear
-baseline matches or beats the search, because Nemotron repairs each of them in
-one or two patches. A case one patch solves cannot measure a search, and for a
-long time this repository had nothing else.
+`masked-faults` shows why. An import error stops the suite collecting, so two
+further faults give no signal until it is repaired; then the obvious fix — the
+one the failing test is named after — moves nothing, because a second fault still
+hides the rows that would prove it. The [branching tree](https://znlong2203.github.io/Nebius-Nvidia/?run=run-02b4f440)
+put three rival repairs on one checkpoint: the obvious one came back **neutral**,
+its sibling reached 3/4, and the next fork from the sibling went green. The
+[linear tree](https://znlong2203.github.io/Nebius-Nvidia/?run=run-1fd073c5) spent
+ten of its twelve patches retrying the right theories on one state, and every one
+that applied regressed the suite back to a collection error. With no sibling evaluated from
+the same state, it could not tell a wrong theory from a wrong implementation of
+a right one.
 
-`masked-faults` was built so that cannot happen. An import error stops the suite
-collecting, so two further faults produce no observable signal until it is
-repaired; then the obvious fix — the one the failing test is literally named
-after — moves nothing, because a second fault is still hiding the rows that
-would have proved it.
+**On real repositories the two arms are level.** SWE-bench Lite, 23 validated
+instances from flask, seaborn and pytest, inside the benchmark's own images, one
+run per arm, every solve re-verified from a clean checkout
+([`evals/swebench/results.md`](evals/swebench/results.md)):
 
-| `masked-faults` | solved | patches (median) | wall (median) | tokens (median) | setup runs |
+| | resolved | patches (median) | wall (median) | model cost | Ultra calls |
 |---|---|---|---|---|---|
-| **branching** | **2/2** | 6 | 191s | 55.9k | 1 |
-| linear baseline | **0/2** | 12 (budget exhausted) | 582s | 159.8k | 13 |
+| branching | 14/23 | 3 | 257 s | **$1.94** | 26 |
+| linear | **15/23** | 6 | 449 s | $5.84 | 140 |
 
-The trees say why. The branching run put three rival repairs on the same
-checkpoint; the one the test name points at came back **neutral — no test
-changed state** — while its sibling reached 3/4 and the next fork closed it out.
-The linear run tried twelve patches across three different first repairs and
-every second-level attempt regressed the suite back to a collection error. It
-had no sibling evaluated from the same state to compare against, so it could not
-tell a wrong theory from a wrong implementation of a right one.
+Paired by instance, branching alone resolved 2 and linear alone 3 — no
+difference at this size. What branching bought on real code was not resolves but
+cost: the same outcome at a third of the price and a little over half the time.
+Part of that gap is a rule rather than the strategy: after two expansions
+without progress, diagnosis escalates to Ultra and stays there until something
+improves. A linear search stalls far more often, so the linear arm paid for Ultra
+on most of its diagnoses — and also had the stronger diagnostician for them.
+This setting shows the agent the failing tests, so it is **not comparable to the
+SWE-bench leaderboard**; the method is in [`evals/swebench/README.md`](evals/swebench/README.md).
 
-This is the comparison **after** removing three biases that had favoured
-branching: a depth cap that limited the linear arm to four patches, a frontier
-rule that stopped it with most of its budget unspent, and setup costs computed
-from a formula rather than counted. Two runs per arm is a small sample, and one
-case is one case — but the linear arm exhausting its full budget twice without
-passing a second test is not a coin flip.
+**Nemotron against size-matched models.** The same branching search with Qwen3
+30B A3B as Nano, gpt-oss 120B as Super and Qwen3 235B A22B as Ultra, from the same
+Token Factory account, solved all 12 small-case runs against Nemotron's 11,
+faster on three of the four cases, for $0.06 against $0.26
+([`evals/results-contree-baseline.md`](evals/results-contree-baseline.md)). On
+these four cases the search and the tiering carry the result, and the specific
+model family does not; four small cases cannot say more than that.
 
-Two further things the eval shows, both narrower and both worth having: scoring
-against the parent's *test identities* makes a trade — fixed two, broke one —
-visible as the regression it is rather than as progress (see `Arborist.score`),
-and forking a warm checkpoint paid the environment setup **once** against the
-baseline's thirteen times.
+**The five biases, all of which favoured branching, and all removed before these
+numbers:** a shared depth cap that held the linear arm to four patches; a search
+that stopped instead of revisiting a state when nothing was left unexpanded; setup
+costs computed from a formula instead of counted; a patch that failed to apply
+dropping its parent state altogether; and a per-state cap, counted in expansions,
+that gave the linear arm three attempts per state against branching's nine. Each
+was found by reading saved trees rather than tables.
+
+**What mattered as much as the search.** During the build, three of every five
+patches never reached the sandbox: the model quoted a fragment of a file slightly
+wrong, and the next expansion repeated it, because a failed patch taught the
+search nothing. Naming short files as whole-file rewrites and giving a failed
+patch one repair attempt with the reason fed back took that from 3-of-5 to 0-of-8.
+Scoring against the parent's *test identities* matters in the same way: a trade —
+fixed two, broke one — shows up as the regression it is, not as progress.
 
 > Every results table is checked in, stamped with the commit that produced it
 > (`evals/results*.md`), and the run trees behind the claims are in

@@ -14,6 +14,10 @@ named by `demo` is what the page opens on, and every entry is reachable at
 | `demo-broken-invoice.json` | **The demo.** `examples/broken-invoice` on Nebius Sandboxes, fan-out 4, tests protected: rival fixes forked from one checkpoint, two branches that broke passing tests abandoned, green at depth 2. 207 s, of which 15 s in the sandbox. The diff is the three real fixes and nothing else | 21 Sep 2026 |
 | `demo-broken-invoice-alt-1.json` | The same configuration recorded again: three patches refused before they reached the sandbox, green at depth 3 | 21 Sep 2026 |
 | `demo-broken-invoice-alt-2.json` | And a third time: one patch fixed all three bugs, green at depth 1 | 21 Sep 2026 |
+| `masked-faults-branching.json` | The case built to need a search, solved by branching: rival repairs on one checkpoint, setup run once. From the final measurement (commit `7b11e3d`) | 21 Sep 2026 |
+| `masked-faults-linear.json` | The same case, linear baseline, same budget: twelve patches, setup run eleven times, not solved | 21 Sep 2026 |
+| `tavily-outside-knowledge.json` | A runtime Tavily call: diagnosis attributes the failure to Pydantic v2, looks up the migration, and the next patch solves it | 21 Sep 2026 |
+| `tavily-swebench-pytest-7373.json` | A Tavily call during a **real** repository repair — SWE-bench Lite `pytest-7373`, resolved and independently re-verified | 21 Sep 2026 |
 | `sandboxes-first-run.json` | The first search ever executed on real Sandboxes, before rewrite minimisation existed — its diff shows the quote-restyling noise that motivated it | 21 Sep 2026 |
 
 **How the demo was chosen.** The three `demo-*` files are every recording made

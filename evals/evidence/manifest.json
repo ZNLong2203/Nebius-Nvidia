@@ -20,6 +20,26 @@
       "file": "sandboxes-first-run.json",
       "title": "The first search ever executed on real Nebius Sandboxes",
       "recorded_at": 1789982918
+    },
+    {
+      "file": "masked-faults-branching.json",
+      "title": "masked-faults, branching on Sandboxes: the obvious fix comes back neutral, its sibling does not -- solved",
+      "recorded_at": 1790014215
+    },
+    {
+      "file": "masked-faults-linear.json",
+      "title": "masked-faults, linear baseline on Sandboxes: twelve patches, setup eleven times, not solved",
+      "recorded_at": 1790014215
+    },
+    {
+      "file": "tavily-outside-knowledge.json",
+      "title": "outside-knowledge: diagnosis looks up the Pydantic v2 migration with Tavily, then solves",
+      "recorded_at": 1790014215
+    },
+    {
+      "file": "tavily-swebench-pytest-7373.json",
+      "title": "SWE-bench Lite pytest-7373: a Tavily lookup during a real repository repair, resolved and re-verified",
+      "recorded_at": 1790023329
     }
   ]
 }

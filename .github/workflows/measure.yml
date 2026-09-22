@@ -8,6 +8,10 @@ name: Measure
 # triggers it but a person, and secrets are never exposed to pull requests from
 # forks. Results come back as artifacts, to be reviewed and committed by hand.
 #
+# This is the one workflow that holds API keys, so every action in it is pinned
+# to a commit rather than a tag: a tag can be moved to new code by whoever
+# controls the action's repository, a commit cannot.
+#
 # Order matters for the timings: the small-case sweeps run alone, one after
 # the other; only the SWE-bench shards overlap, two at a time, and each shard
 # runs both arms of its instances itself, so any shared load falls on both.
@@ -44,8 +48,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - name: Install
         run: |
           uv python install 3.12
@@ -59,7 +63,7 @@ jobs:
               --repeat "${{ inputs.repeat }}" --resume --out evals/results-contree.md && break
             echo "::warning::sweep exited abnormally (attempt $attempt), resuming"
           done
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: nemotron
@@ -75,8 +79,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 350
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - name: Install
         run: |
           uv python install 3.12
@@ -90,7 +94,7 @@ jobs:
               --out evals/results-contree-baseline.md && break
             echo "::warning::sweep exited abnormally (attempt $attempt), resuming"
           done
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: baseline
@@ -111,8 +115,8 @@ jobs:
       matrix:
         shard: [1, 2, 3, 4, 5]
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - name: Install
         run: |
           uv python install 3.12
@@ -125,7 +129,7 @@ jobs:
               --reports --out "evals/swebench/results-shard-${{ matrix.shard }}.md" && break
             echo "::warning::shard exited abnormally (attempt $attempt), resuming"
           done
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: swebench-shard-${{ matrix.shard }}
@@ -140,14 +144,14 @@ jobs:
     if: ${{ !cancelled() && (inputs.steps == 'all' || inputs.steps == 'swebench') }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7.0.1
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
       - name: Install
         run: |
           uv python install 3.12
           uv venv --python 3.12
           uv pip install -e ".[contree,dev]"
-      - uses: actions/download-artifact@v8.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: swebench-shard-*
           path: shards
@@ -155,7 +159,7 @@ jobs:
         run: |
           uv run python evals/swebench/run_swebench.py merge $(find shards -name 'results-shard-*.json' | sort) \
             --out evals/swebench/results.md
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: swebench
           path: |

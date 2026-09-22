@@ -11,11 +11,16 @@ invalid patches, wall time, and tokens per tier.
 
 ## What these cases do and do not measure
 
-Of the four, **only `masked-faults` discriminates**. The other three are each solved by Nemotron 3 in one or two
-patches, and a case that one patch solves cannot measure a search. They are
-still worth running — they caught a patch-application bug that was losing three
-of five branches — but the claim that branching beats a linear baseline rests on
-`masked-faults` alone, and on two runs per arm.
+Two of the four discriminate. Measured on Nebius Sandboxes at commit `7b11e3d`,
+three runs per arm ([`results-contree.md`](results-contree.md)), branching solved
+`broken-invoice` 3/3 and `masked-faults` 2/3; the linear baseline solved neither
+once, spending its full budget every time. `regression-trap` and
+`outside-knowledge` are solved in one to three patches by both arms, 3/3 each, and
+a case one patch solves cannot measure a search. They are still worth running —
+they caught a patch-application bug that was losing three of five branches — but
+the claim that branching beats a linear baseline rests on the first two, and on
+three runs per arm. On real repositories, see [`swebench/`](swebench/README.md):
+there the arms are level on resolves and branching is cheaper.
 
 ## What "the same budget" means
 
@@ -98,20 +103,22 @@ fault that unlocks three tests is the one nothing points at.
 Reading the source cannot separate them: which fix moves the numbers depends on
 where the rows fall in the data. Only running does.
 
-**What it measures: whether a search is worth anything.** The other three cases
-are solved by one or two patches, so they cannot. This one does.
+**What it measures: whether a search is worth anything.** On Sandboxes, commit
+`7b11e3d`, three runs per arm:
 
 | | solved | patches (median) | wall (median) | setup runs |
 |---|---|---|---|---|
-| branching | **2/2** | 6 | 191s | 1 |
-| linear baseline | **0/2** | 12 — budget exhausted | 582s | 13 |
+| branching | **2/3** | 8 | 313 s | 1 per run |
+| linear baseline | **0/3** | 12 — budget exhausted | 470 s | 11–12 per run |
 
-The branching run put three rival repairs on one checkpoint: the fix the failing
-test is named after came back **neutral**, its sibling reached 3/4, and the next
-fork closed it out. The linear run tried twelve patches across three different
-first repairs, and every second-level attempt regressed the suite back to a
-collection error — it had no sibling from the same state to compare against, so
-it could not tell a wrong theory from a wrong implementation of a right one.
+The [branching tree](../evals/evidence/masked-faults-branching.json) put three
+rival repairs on one checkpoint: the fix the failing test is named after came
+back **neutral**, its sibling reached 3/4, and the next fork closed it out. The
+[linear tree](../evals/evidence/masked-faults-linear.json) spent ten of its twelve
+patches retrying the right theories on one state, and every one that applied
+regressed the suite back to a collection error — it had no sibling from the same
+state to compare against, so it could not tell a wrong theory from a wrong
+implementation of a right one.
 
 ### `outside-knowledge` — knowing when to look it up
 
@@ -133,5 +140,7 @@ fails on `DeprecationWarning`:
 
 No partial credit is available: until both decorators are migrated the suite does
 not collect, so every branch scores zero. That makes this the opposite of
-`broken-invoice` — the only thing that helps is **breadth**, several rival
-migrations evaluated from one prepared checkpoint.
+`broken-invoice`: depth cannot help, only breadth — several rival migrations
+evaluated from one prepared checkpoint. In practice the lookup does most of the
+work: once diagnosis has the migration guide, one patch is usually enough, and
+the linear baseline solved it 3/3 as well.

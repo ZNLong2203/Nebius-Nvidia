@@ -1,5 +1,12 @@
 # Eval results
 
+> **Superseded.** A local-backend sweep from commit `244496d`, taken before the
+> fifth bias was fixed (a per-state cap that gave the linear arm a third of the
+> attempts). The numbers the README cites are in
+> [`results-contree.md`](results-contree.md), measured on Nebius Sandboxes at
+> commit `7b11e3d`. Kept for the record; `run_eval.py` overwrites this file by
+> default.
+
 backend: `local` · fanout: 3 · node cap: 12 · models: `nemotron` (nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B, nvidia/nemotron-3-super-120b-a12b, nvidia/Nemotron-3-Ultra-550b-a55b) · 2 run(s) per configuration
 
 ## Summary

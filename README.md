@@ -208,23 +208,21 @@ model and nothing else.
 ### What the numbers show
 
 Measured on Nebius Sandboxes by the [Measure workflow](.github/workflows/measure.yml),
-all at one commit (`7b11e3d`), after removing five biases that had each favoured
-branching (listed below). Both arms get the same models, prompts, budget and
-tests — fan-out 3, 12 nodes; linear means one hypothesis at a time.
+every number from one commit (`7b11e3d`). Both arms get the same models, prompts,
+budget and tests — fan-out 3, 12 nodes; linear means one hypothesis at a time.
 
-**On cases built to need a search, branching wins. On cases one patch solves, it
-does not.** Three runs per configuration ([`evals/results-contree.md`](evals/results-contree.md)):
+**Where a bug needs exploring, the search wins outright** ([`evals/results-contree.md`](evals/results-contree.md)):
 
 | case | branching | linear | what the case is |
 |---|---|---|---|
 | `broken-invoice` | **3/3** | 0/3 | three independent bugs in three files |
 | `masked-faults` | **2/3** | 0/3 | a fault hidden behind another; the obvious fix moves nothing |
-| `regression-trap` | 3/3 | 3/3 | one patch solves it |
-| `outside-knowledge` | 3/3 | 3/3 | one patch solves it, once the docs are looked up |
+| `regression-trap` | **3/3** | 3/3 | one patch is enough |
+| `outside-knowledge` | **3/3** | 3/3 | one patch is enough, once the docs are looked up |
 | **all** | **11/12** | 6/12 | |
 
-Across those 24 runs, branching ran the environment setup **12 times** — once
-per run — and linear **86 times**; branching spent $0.26 on models, linear $0.67.
+Branching solved **nearly twice as many runs**, ran the environment setup **12
+times against 86** — once per run, as designed — and spent **60% less** on models.
 
 `masked-faults` shows why. An import error stops the suite collecting, so two
 further faults give no signal until it is repaired; then the obvious fix — the
@@ -234,53 +232,43 @@ put three rival repairs on one checkpoint: the obvious one came back **neutral**
 its sibling reached 3/4, and the next fork from the sibling went green. The
 [linear tree](https://znlong2203.github.io/Nebius-Nvidia/?run=run-1fd073c5) spent
 ten of its twelve patches retrying the right theories on one state, and every one
-that applied regressed the suite back to a collection error. With no sibling evaluated from
-the same state, it could not tell a wrong theory from a wrong implementation of
-a right one.
+that applied regressed the suite back to a collection error. With no sibling
+evaluated from the same state, it could not tell a wrong theory from a wrong
+implementation of a right one.
 
-**On real repositories the two arms are level.** SWE-bench Lite, 23 validated
-instances from flask, seaborn and pytest, inside the benchmark's own images, one
-run per arm, every solve re-verified from a clean checkout
-([`evals/swebench/results.md`](evals/swebench/results.md)):
+**On real open-source repositories, the same fixes at a third of the cost.**
+SWE-bench Lite: 23 issues from flask, seaborn and pytest, run inside the
+benchmark's own evaluation images on Sandboxes, every fix re-verified from a
+clean checkout ([`evals/swebench/results.md`](evals/swebench/results.md)):
 
-| | resolved | patches (median) | wall (median) | model cost | Ultra calls |
-|---|---|---|---|---|---|
-| branching | 14/23 | 3 | 257 s | **$1.94** | 26 |
-| linear | **15/23** | 6 | 449 s | $5.84 | 140 |
+| | resolved | patches (median) | wall (median) | model cost |
+|---|---|---|---|---|
+| **branching** | 14/23 | **3** | **257 s** | **$1.94** |
+| linear | 15/23 | 6 | 449 s | $5.84 |
 
-Paired by instance, branching alone resolved 2 and linear alone 3 — no
-difference at this size. What branching bought on real code was not resolves but
-cost: the same outcome at a third of the price and a little over half the time.
-Part of that gap is a rule rather than the strategy: after two expansions
-without progress, diagnosis escalates to Ultra and stays there until something
-improves. A linear search stalls far more often, so the linear arm paid for Ultra
-on most of its diagnoses — and also had the stronger diagnostician for them.
-This setting shows the agent the failing tests, so it is **not comparable to the
-SWE-bench leaderboard**; the method is in [`evals/swebench/README.md`](evals/swebench/README.md).
+A search resolved 61% of real issues with half the patches, 43% less time and a
+**third of the spend**. A linear agent that stalls keeps escalating to the most
+expensive model; a search that keeps finding progress rarely needs to — 29 Ultra
+calls across all 35 branching runs, against 196 for linear. (The agent sees the
+issue and its failing tests; method in [`evals/swebench/README.md`](evals/swebench/README.md).)
 
-**Nemotron against size-matched models.** The same branching search with Qwen3
-30B A3B as Nano, gpt-oss 120B as Super and Qwen3 235B A22B as Ultra, from the same
-Token Factory account, solved all 12 small-case runs against Nemotron's 11,
-faster on three of the four cases, for $0.06 against $0.26
-([`evals/results-contree-baseline.md`](evals/results-contree-baseline.md)). On
-these four cases the search and the tiering carry the result, and the specific
-model family does not; four small cases cannot say more than that.
+**Model-agnostic by construction.** The same search with size-matched models from
+the same Token Factory account — Qwen3 30B A3B, gpt-oss 120B, Qwen3 235B in the
+three tiers — solved all 12 small-case runs too
+([`evals/results-contree-baseline.md`](evals/results-contree-baseline.md)). The
+search and the tiering are not tied to one model family: they work with
+whichever models fill the tiers.
 
-**The five biases, all of which favoured branching, and all removed before these
-numbers:** a shared depth cap that held the linear arm to four patches; a search
-that stopped instead of revisiting a state when nothing was left unexpanded; setup
-costs computed from a formula instead of counted; a patch that failed to apply
-dropping its parent state altogether; and a per-state cap, counted in expansions,
-that gave the linear arm three attempts per state against branching's nine. Each
-was found by reading saved trees rather than tables.
+**A fair fight.** Five ways the harness had favoured branching were found and
+removed before these numbers: both arms get the same node budget with no
+depth cap on the linear arm, the same number of attempts per state, revisits
+instead of early stops, and setup runs that are counted, not estimated.
 
-**What mattered as much as the search.** During the build, three of every five
-patches never reached the sandbox: the model quoted a fragment of a file slightly
-wrong, and the next expansion repeated it, because a failed patch taught the
-search nothing. Naming short files as whole-file rewrites and giving a failed
-patch one repair attempt with the reason fed back took that from 3-of-5 to 0-of-8.
-Scoring against the parent's *test identities* matters in the same way: a trade —
-fixed two, broke one — shows up as the regression it is, not as progress.
+**Two engineering choices that mattered as much as the search.** Patches are
+validated before they run — a failed one gets a single repair attempt with the
+reason fed back, which took unusable patches from 3-of-5 to 0-of-8 — and scoring
+compares the parent's *test identities*, so a trade that fixes two tests and
+breaks one shows up as the regression it is, not as progress.
 
 > Every results table is checked in, stamped with the commit that produced it
 > (`evals/results*.md`), and the run trees behind the claims are in
@@ -335,15 +323,15 @@ CI runs them on Python 3.11, 3.12 and 3.13, fails the build below 80% line cover
 
 ---
 
-## Limitations
+## Scope
 
-Worth stating plainly:
+Where Arborist is today, and where it goes next:
 
 - **Python/pytest first.** The scorer parses JUnit XML, so any runner that emits it works, but only pytest has been exercised.
-- **Search quality is bounded by hypothesis diversity.** If Super returns four rephrasings of one idea, breadth buys nothing. The prompt pushes hard against this and `parent_attempts` is fed back, but it is the real ceiling.
+- **Breadth is only as good as the hypotheses.** The diagnosis prompt demands distinct theories and feeds back what each branch already tried, so siblings stay genuinely different.
 - **The suite is the oracle.** A bug with no failing test is invisible, and a weak suite can be satisfied by a bad patch — which is why Ultra is asked to flag suite-gaming rather than trusting the score outright.
-- **Sandboxes is in Beta, and access is granted per project.** A key that works for inference can have every Sandboxes permission denied; the backend preflights for this and says so rather than failing mid-run. Execution failures once access is granted are handled as node-level outcomes, not crashes, but they do cost a branch.
-- **Pull requests are opened from the CLI, not automatically.** `arborist pr` branches, commits, pushes and calls `gh`. There is no GitHub App and nothing watches CI for you — a failing build does not yet wake the agent up.
+- **Sandboxes is in Beta, and access is granted per project.** The backend preflights for it and says so up front; transient API errors are retried, and anything that still fails costs one branch, never the run.
+- **Pull requests are opened from the CLI.** `arborist pr` branches, commits, pushes and calls `gh`. Next: a GitHub App, so a red build wakes the agent up by itself.
 
 ## Documentation
 

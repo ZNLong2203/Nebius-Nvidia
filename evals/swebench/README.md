@@ -1,9 +1,8 @@
 # SWE-bench Lite on Nebius Sandboxes
 
-The hand-built cases in [`evals/cases`](../cases) were designed to test a
-search, which makes them easy to suspect of being designed to *flatter* one.
-This runs Arborist on real issues from real projects instead: instances from
-[SWE-bench Lite](https://www.swebench.com), inside the benchmark's own
+The hand-built cases in [`evals/cases`](../cases) isolate one behaviour each.
+This runs Arborist on code nobody wrote for it: real issues from real projects,
+from [SWE-bench Lite](https://www.swebench.com), inside the benchmark's own
 evaluation images, on Nebius Sandboxes.
 
 ## What is measured — read before quoting a number

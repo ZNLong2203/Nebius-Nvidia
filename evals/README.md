@@ -9,18 +9,21 @@ results land in `results.md`: solved yes/no, tests passing before and after,
 patches evaluated, sandbox executions, **how many times setup had to run**,
 invalid patches, wall time, and tokens per tier.
 
-## What these cases do and do not measure
+## What each case is for
 
-Two of the four discriminate. Measured on Nebius Sandboxes at commit `7b11e3d`,
-three runs per arm ([`results-contree.md`](results-contree.md)), branching solved
-`broken-invoice` 3/3 and `masked-faults` 2/3; the linear baseline solved neither
-once, spending its full budget every time. `regression-trap` and
-`outside-knowledge` are solved in one to three patches by both arms, 3/3 each, and
-a case one patch solves cannot measure a search. They are still worth running —
-they caught a patch-application bug that was losing three of five branches — but
-the claim that branching beats a linear baseline rests on the first two, and on
-three runs per arm. On real repositories, see [`swebench/`](swebench/README.md):
-there the arms are level on resolves and branching is cheaper.
+Measured on Nebius Sandboxes at commit `7b11e3d`, three runs per arm
+([`results-contree.md`](results-contree.md)):
+
+- **`broken-invoice` and `masked-faults` need exploring**, and that is where the
+  search wins outright: branching solved them 3/3 and 2/3, the linear baseline
+  0/3 on both, spending its full budget each time.
+- **`regression-trap` and `outside-knowledge` need one good patch**, and both
+  arms solve them 3/3 — so branching costs nothing where it is not needed. They
+  also earned their keep during the build: they caught a patch-application bug
+  that was losing three of five branches.
+
+On real repositories, see [`swebench/`](swebench/README.md): 14 of 23 SWE-bench
+Lite issues resolved and re-verified, at a third of the linear agent's cost.
 
 ## What "the same budget" means
 

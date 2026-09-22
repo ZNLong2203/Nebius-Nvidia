@@ -61,6 +61,8 @@ export interface TierUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
+  /** Dollars at list price. Absent from runs recorded before costs were tracked. */
+  cost_usd?: number;
 }
 
 export interface Usage {
@@ -68,6 +70,8 @@ export interface Usage {
   models: Record<string, string>;
   total_tokens: number;
   budget: number;
+  cost_usd?: number;
+  max_cost_usd?: number;
 }
 
 export interface RunStats {

@@ -31,6 +31,26 @@ MODEL_ULTRA = "nvidia/Nemotron-3-Ultra-550b-a55b"
 
 TIERS = {"nano": MODEL_NANO, "super": MODEL_SUPER, "ultra": MODEL_ULTRA}
 
+# US dollars per token, (prompt, completion), as `GET /v1/models?verbose=true`
+# reported them on 2026-09-22. Ultra costs about 17 times what Nano does, which
+# is exactly why the tiers exist -- and why a run has to know what it spends.
+PRICES: dict[str, tuple[float, float]] = {
+    MODEL_NANO: (0.06e-6, 0.24e-6),
+    MODEL_SUPER: (0.30e-6, 0.90e-6),
+    MODEL_ULTRA: (1.00e-6, 3.00e-6),
+    # The size-matched comparison models in evals/run_eval.py.
+    "Qwen/Qwen3-30B-A3B-Instruct-2507": (0.10e-6, 0.30e-6),
+    "openai/gpt-oss-120b": (0.15e-6, 0.60e-6),
+    "Qwen/Qwen3-235B-A22B-Instruct-2507": (0.20e-6, 0.60e-6),
+}
+
+
+def _float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, "") or default)
+    except ValueError:
+        return default
+
 
 def _int(name: str, default: int) -> int:
     try:
@@ -62,6 +82,10 @@ class Settings:
     max_nodes: int = 24
     max_depth: int = 4
     token_budget: int = 1_500_000
+    max_cost: float = 2.0
+    """Dollars one run may spend on models before it stops and keeps its best
+    branch; 0 means no limit. The most expensive run measured so far cost
+    $1.00, so the default only ever stops a run that has gone badly wrong."""
 
     # --- sandbox -------------------------------------------------------------
     default_image: str = "python:3.12-slim"
@@ -109,6 +133,7 @@ def load_settings(**overrides) -> Settings:
         max_nodes=_int("ARBORIST_MAX_NODES", Settings.max_nodes),
         max_depth=_int("ARBORIST_MAX_DEPTH", Settings.max_depth),
         token_budget=_int("ARBORIST_TOKEN_BUDGET", Settings.token_budget),
+        max_cost=_float("ARBORIST_MAX_COST", Settings.max_cost),
         workdir=os.environ.get("ARBORIST_WORKDIR") or Settings.workdir,
         runs_dir=os.environ.get("ARBORIST_RUNS_DIR") or Settings.runs_dir,
         demo_run=os.environ.get("ARBORIST_DEMO_RUN", ""),

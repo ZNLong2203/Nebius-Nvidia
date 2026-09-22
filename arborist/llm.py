@@ -27,7 +27,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from .config import Settings
+from .config import PRICES, Settings
 
 
 @dataclass
@@ -44,6 +44,11 @@ class Usage:
     @property
     def total(self) -> int:
         return self.prompt + self.completion
+
+    def cost(self, model: str) -> float:
+        """Dollars at Token Factory's list price; 0 for a model with no price on file."""
+        prompt, completion = PRICES.get(model, (0.0, 0.0))
+        return self.prompt * prompt + self.completion * completion
 
     def to_dict(self) -> dict[str, int]:
         return {
@@ -78,6 +83,7 @@ class NemotronClient:
         )
         self._models = settings.models
         self._budget = settings.token_budget
+        self._max_cost = settings.max_cost
         self._lock = threading.Lock()
         self.usage: dict[str, Usage] = {tier: Usage() for tier in self._models}
 
@@ -86,13 +92,28 @@ class NemotronClient:
     def tokens_used(self) -> int:
         return sum(u.total for u in self.usage.values())
 
+    @property
+    def cost_used(self) -> float:
+        return sum(u.cost(self._models[t]) for t, u in self.usage.items())
+
     def usage_report(self) -> dict[str, Any]:
         return {
-            "by_tier": {t: u.to_dict() for t, u in self.usage.items()},
+            "by_tier": {
+                t: {**u.to_dict(), "cost_usd": round(u.cost(self._models[t]), 4)} for t, u in self.usage.items()
+            },
             "models": dict(self._models),
             "total_tokens": self.tokens_used,
             "budget": self._budget,
+            "cost_usd": round(self.cost_used, 4),
+            "max_cost_usd": self._max_cost,
         }
+
+    def _over_budget(self) -> str:
+        if self.tokens_used > self._budget:
+            return f"token budget exhausted: {self.tokens_used:,} > {self._budget:,}"
+        if self._max_cost and self.cost_used > self._max_cost:
+            return f"cost limit reached: ${self.cost_used:.2f} > ${self._max_cost:.2f} (ARBORIST_MAX_COST)"
+        return ""
 
     def _charge(self, tier: str, response) -> None:
         usage = getattr(response, "usage", None)
@@ -100,10 +121,9 @@ class NemotronClient:
         completion = int(getattr(usage, "completion_tokens", 0) or 0)
         with self._lock:
             self.usage[tier].add(prompt, completion)
-            if self.tokens_used > self._budget:
-                raise BudgetExceeded(
-                    f"token budget exhausted: {self.tokens_used} > {self._budget}"
-                )
+            reason = self._over_budget()
+        if reason:
+            raise BudgetExceeded(reason)
 
     # -- calls --------------------------------------------------------------
     def _chat(
@@ -118,8 +138,9 @@ class NemotronClient:
     ):
         model = self._models[tier]
         with self._lock:
-            if self.tokens_used > self._budget:
-                raise BudgetExceeded(f"token budget exhausted before call to {model}")
+            reason = self._over_budget()
+        if reason:
+            raise BudgetExceeded(f"{reason}; not calling {model}")
         kwargs: dict[str, Any] = {
             "model": model,
             "messages": [

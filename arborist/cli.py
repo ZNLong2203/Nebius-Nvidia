@@ -173,8 +173,21 @@ def _print_result(result: RunResult) -> None:
     usage.add_column("model")
     usage.add_column("calls", justify="right")
     usage.add_column("tokens", justify="right")
+    usage.add_column("cost", justify="right")
     for tier, u in result.usage.get("by_tier", {}).items():
-        usage.add_row(tier, result.usage["models"].get(tier, ""), str(u["calls"]), f"{u['total_tokens']:,}")
+        usage.add_row(
+            tier,
+            result.usage["models"].get(tier, ""),
+            str(u["calls"]),
+            f"{u['total_tokens']:,}",
+            f"${u.get('cost_usd', 0):.3f}",
+        )
+    if "cost_usd" in result.usage:
+        limit = result.usage.get("max_cost_usd") or 0
+        usage.add_row(
+            "total", "", "", f"{result.usage.get('total_tokens', 0):,}",
+            f"${result.usage['cost_usd']:.3f}" + (f" of ${limit:.2f}" if limit else ""),
+        )
     console.print(usage)
 
     if result.solved:

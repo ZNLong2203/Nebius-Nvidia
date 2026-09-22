@@ -114,6 +114,7 @@ branch exists leaves the commit in place rather than unwinding it silently.
 | `ARBORIST_MAX_NODES` | `24` | Cap on candidate patches. Counts every node created, including patches rejected before execution |
 | `ARBORIST_MAX_DEPTH` | `4` | Tree depth cap |
 | `ARBORIST_TOKEN_BUDGET` | `1500000` | Total tokens across all tiers |
+| `ARBORIST_MAX_COST` | `2.0` | Dollars one run may spend on models, at Token Factory list price; `0` for no limit. The run stops and keeps its best branch |
 | `ARBORIST_RUNS_DIR` | `runs` | Where reports are written and replayed from |
 | `ARBORIST_DEMO_RUN` | — | A specific report to show on page load. Without it, the best report in `ARBORIST_RUNS_DIR`, then the demo shipped in `evals/evidence/` |
 | `ARBORIST_WORKDIR` | `/workspace` | Where the repository lives inside the sandbox. `/testbed` for SWE-bench images, which ship the project installed there |

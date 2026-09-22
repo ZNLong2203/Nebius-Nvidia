@@ -51,8 +51,11 @@ export function SpendStrip({ result }: { result: RunResult | null }) {
         </div>
         {grand > 0 && (
           <p className="mt-2 text-[11.5px] text-ink-3">
-            {grand.toLocaleString()} tokens total. Most branches are discarded, so the discarded
-            work is the cheap work.
+            {grand.toLocaleString()} tokens total
+            {typeof usage?.cost_usd === "number" && usage.cost_usd > 0
+              ? ` · $${usage.cost_usd.toFixed(2)} at list price`
+              : ""}
+            . Most branches are discarded, so the discarded work is the cheap work.
           </p>
         )}
       </div>

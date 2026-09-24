@@ -430,3 +430,34 @@ def test_a_docstring_whose_words_changed_keeps_its_new_words():
     rewrite = MULTILINE.replace("Half-cents round away from zero.", "Half-cents round up.")
     out = apply_edits({"money.py": MULTILINE}, [Edit(path="money.py", new_content=rewrite)])
     assert "Half-cents round up." in out["money.py"]
+
+
+def test_a_docstring_whose_words_changed_keeps_its_original_quotes():
+    """The words are the change; the quotes around them are not."""
+    rewrite = MULTILINE.replace('"""', "'''").replace(
+        "Every amount is rounded to two decimal places.", "Every amount is rounded to 2 places."
+    )
+    out = apply_edits({"money.py": MULTILINE}, [Edit(path="money.py", new_content=rewrite)])
+    assert _changed_lines(MULTILINE, out["money.py"]) == [
+        "-Every amount is rounded to two decimal places.",
+        "+Every amount is rounded to 2 places.",
+    ]
+
+
+def test_a_quote_swap_that_would_change_the_value_is_left_alone():
+    before = "x = 'it is'\n"
+    after = 'x = "it\'s"\n'
+    out = apply_edits({"m.py": before}, [Edit(path="m.py", new_content=after)])
+    assert out["m.py"] == after, "respelling in single quotes would need an escape; keep the model's spelling"
+
+
+def test_quotes_are_kept_when_an_import_lands_in_the_same_region_as_a_changed_docstring():
+    """The shape of the Action's second pull request: docstring words, quotes and an import at once."""
+    rewrite = MULTILINE.replace('"""', "'''").replace(
+        "Every amount is rounded to two decimal places.\n'''\n\n\n",
+        " Every amount is rounded to two decimal places.\n'''\n\nfrom decimal import Decimal\n\n",
+    )
+    out = apply_edits({"money.py": MULTILINE}, [Edit(path="money.py", new_content=rewrite)])
+    changed = _changed_lines(MULTILINE, out["money.py"])
+    assert not any("'''" in line for line in changed), changed
+    assert "+from decimal import Decimal" in changed

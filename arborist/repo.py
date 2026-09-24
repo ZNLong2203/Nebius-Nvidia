@@ -285,13 +285,24 @@ def _restore_string_spelling(before: str, after: str) -> str:
         a=[key(t) for t in old_tokens], b=[key(t) for t in new_tokens], autojunk=False
     )
     swaps: list[tuple[tuple[int, int], tuple[int, int], str]] = []
-    for tag, i1, _i2, j1, j2 in matcher.get_opcodes():
-        if tag != "equal":
-            continue
-        for step in range(j2 - j1):
-            original, rewritten = old_tokens[i1 + step], new_tokens[j1 + step]
-            if rewritten.type == tokenize.STRING and original.string != rewritten.string:
-                swaps.append((rewritten.start, rewritten.end, original.string))
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for step in range(j2 - j1):
+                original, rewritten = old_tokens[i1 + step], new_tokens[j1 + step]
+                if rewritten.type == tokenize.STRING and original.string != rewritten.string:
+                    swaps.append((rewritten.start, rewritten.end, original.string))
+        elif tag == "replace":
+            # A changed region with as many strings on each side: pair them in
+            # order. The words may have changed; the quotes need not have. (The
+            # region can hold other tokens too -- an import inserted under a
+            # docstring lands in the same one.)
+            old_strings = [t for t in old_tokens[i1:i2] if t.type == tokenize.STRING]
+            new_strings = [t for t in new_tokens[j1:j2] if t.type == tokenize.STRING]
+            if len(old_strings) == len(new_strings):
+                for original, rewritten in zip(old_strings, new_strings):
+                    respelled = _respell(original.string, rewritten.string)
+                    if respelled is not None:
+                        swaps.append((rewritten.start, rewritten.end, respelled))
     if not swaps:
         return after
 
@@ -306,6 +317,31 @@ def _restore_string_spelling(before: str, after: str) -> str:
     for start, end, text in sorted(swaps, key=lambda swap: swap[0], reverse=True):
         out = out[: offset(start)] + text + out[offset(end) :]
     return out
+
+
+def _respell(original: str, rewritten: str) -> str | None:
+    """``rewritten``'s value in ``original``'s quotes, when that is safe to do.
+
+    A docstring whose words changed still should not have its quotes changed
+    as well. Only plain delimiters are swapped, only when the prefix is the
+    same, and only if the result evaluates to exactly the rewritten value.
+    """
+    def split(token: str) -> tuple[str, str, str] | None:
+        prefix = token[: len(token) - len(token.lstrip("rRbBuU"))]
+        rest = token[len(prefix) :]
+        for quote in ('"""', "'''", '"', "'"):
+            if rest.startswith(quote) and rest.endswith(quote) and len(rest) >= 2 * len(quote):
+                return prefix, quote, rest[len(quote) : -len(quote)]
+        return None
+
+    old, new = split(original), split(rewritten)
+    if not old or not new or old[0].lower() != new[0].lower() or old[1] == new[1]:
+        return None
+    candidate = new[0] + old[1] + new[2] + old[1]
+    try:
+        return candidate if ast.literal_eval(candidate) == ast.literal_eval(rewritten) else None
+    except (ValueError, SyntaxError):
+        return None
 
 
 def _fingerprint(source: str) -> tuple[str, tuple[str, ...]]:

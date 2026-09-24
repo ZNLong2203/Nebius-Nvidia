@@ -121,6 +121,11 @@ class Node:
     """The external-docs query behind this node's diagnosis, when there was one."""
     lookup_evidence: str = ""
     """The start of what that lookup returned, as the model was shown it."""
+    diff: str = ""
+    """What this node changed relative to its parent, as a unified diff.
+
+    The edits say how the model asked for the change -- often by resending a
+    whole file -- and a reader wants to see what actually changed."""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -145,6 +150,7 @@ class Node:
             "note": self.note,
             "lookup": self.lookup,
             "lookup_evidence": self.lookup_evidence,
+            "diff": self.diff,
         }
 
 

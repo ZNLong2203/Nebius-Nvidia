@@ -138,7 +138,8 @@
       "wall_seconds": 23.32,
       "expanded": true,
       "expansions": 9,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/parse.py\n+++ b/src/ledger/parse.py\n@@ -5,7 +5,7 @@\n from datetime import date\n from pathlib import Path\n \n-from .rules import THRESHOLD_CENTS, classify\n+from .rules import THRESHOLD, classify\n \n \n @dataclass(frozen=True)\n"
     },
     {
       "id": "n-2da340e4",
@@ -187,7 +188,8 @@
       "wall_seconds": 9.38,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/report.py\n+++ b/src/ledger/report.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a transaction dated on the last day of the\n     period belongs to that period.\n     \"\"\"\n-    return [t for t in transactions if start <= t.on < end]\n+    return [t for t in transactions if start <= t.on <= end]\n \n \n def total_cents(transactions: list[Transaction]) -> int:\n"
     },
     {
       "id": "n-ad5a2d4e",
@@ -236,7 +238,8 @@
       "wall_seconds": 45.71,
       "expanded": false,
       "expansions": 0,
-      "note": "applied on retry after: src/ledger/report.py: the patched file is not valid Python (line 25: unterminated triple-quoted string literal (detected at line 25)). Send the file again, complete and unescaped."
+      "note": "applied on retry after: src/ledger/report.py: the patched file is not valid Python (line 25: unterminated triple-quoted string literal (detected at line 25)). Send the file again, complete and unescaped.",
+      "diff": "--- a/src/ledger/report.py\n+++ b/src/ledger/report.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a transaction dated on the last day of the\n     period belongs to that period.\n     \"\"\"\n-    return [t for t in transactions if start <= t.on < end]\n+    return [t for t in transactions if start <= t.on <= end]\n \n \n def total_cents(transactions: list[Transaction]) -> int:\n"
     },
     {
       "id": "n-7c68e987",
@@ -285,7 +288,8 @@
       "wall_seconds": 35.62,
       "expanded": false,
       "expansions": 0,
-      "note": "applied on retry after: src/ledger/report.py: search block not found"
+      "note": "applied on retry after: src/ledger/report.py: search block not found",
+      "diff": "--- a/src/ledger/report.py\n+++ b/src/ledger/report.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a transaction dated on the last day of the\n     period belongs to that period.\n     \"\"\"\n-    return [t for t in transactions if start <= t.on < end]\n+    return [t for t in transactions if start <= t.on <= end]\n \n \n def total_cents(transactions: list[Transaction]) -> int:\n"
     },
     {
       "id": "n-c6677931",
@@ -334,7 +338,8 @@
       "wall_seconds": 9.85,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/rules.py\n+++ b/src/ledger/rules.py\n@@ -1,18 +1 @@\n-\"\"\"Classification rules for ledger entries.\"\"\"\n-\n-# A transaction is \"large\" at or above five hundred currency units.\n-THRESHOLD = 50_000\n-\n-\n-def is_large(amount_cents: int) -> bool:\n-    \"\"\"Whether an amount counts as large.\n-\n-    The boundary is inclusive: an amount exactly equal to the threshold is\n-    large.\n-    \"\"\"\n-    return amount_cents > THRESHOLD\n-\n-\n-def classify(amount_cents: int) -> str:\n-    \"\"\"Bucket an amount for reporting.\"\"\"\n-    return \"large\" if is_large(amount_cents) else \"ordinary\"\n+'''\\nClassification rules for ledger entries.\\n\\n# A transaction is \\\"large\\\" at or above five hundred currency units.\\nTHRESHOLD = 50_000\\n\\n\\ndef is_large(amount_cents: int) -> bool:\\n    \\\"\\\"\\\"Whether an amount counts as large.\\n\\n    The boundary is inclusive: an amount exactly equal to the threshold is\\n    large.\\n    \\\"\\\"\\\"\\n    return amount_cents >= THRESHOLD\\n\\n\\ndef classify(amount_cents: int) -> str:\\n    \\\"\\\"\\\"Bucket an amount for reporting.\\\"\\\"\\\"\\n    return \\\"large\\\" if is_large(amount_cents) else \\\"ordinary\\\"\\n'''"
     },
     {
       "id": "n-d3855565",
@@ -383,7 +388,8 @@
       "wall_seconds": 8.97,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/report.py\n+++ b/src/ledger/report.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a transaction dated on the last day of the\n     period belongs to that period.\n     \"\"\"\n-    return [t for t in transactions if start <= t.on < end]\n+    return [t for t in transactions if start <= t.on <= end]\n \n \n def total_cents(transactions: list[Transaction]) -> int:\n"
     },
     {
       "id": "n-be63921a",
@@ -432,7 +438,8 @@
       "wall_seconds": 18.91,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/report.py\n+++ b/src/ledger/report.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a transaction dated on the last day of the\n     period belongs to that period.\n     \"\"\"\n-    return [t for t in transactions if start <= t.on < end]\n+    return [t for t in transactions if start <= t.on <= end]\n \n \n def total_cents(transactions: list[Transaction]) -> int:\n"
     },
     {
       "id": "n-8778ac1f",
@@ -481,7 +488,8 @@
       "wall_seconds": 11.98,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/rules.py\n+++ b/src/ledger/rules.py\n@@ -10,7 +10,7 @@\n     The boundary is inclusive: an amount exactly equal to the threshold is\n     large.\n     \"\"\"\n-    return amount_cents > THRESHOLD\n+    return amount_cents >= THRESHOLD\n \n \n def classify(amount_cents: int) -> str:\n"
     },
     {
       "id": "n-543ee914",
@@ -566,7 +574,8 @@
       "wall_seconds": 12.22,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/report.py\n+++ b/src/ledger/report.py\n@@ -6,12 +6,12 @@\n \n \n def in_period(transactions: list[Transaction], start: date, end: date) -> list[Transaction]:\n-    \"\"\"Transactions falling in a reporting period.\n+    '''Transactions falling in a reporting period.\n \n     Both endpoints are inclusive: a transaction dated on the last day of the\n     period belongs to that period.\n-    \"\"\"\n-    return [t for t in transactions if start <= t.on < end]\n+    '''\n+    return [t for t in transactions if start <= t.on <= end]\n \n \n def total_cents(transactions: list[Transaction]) -> int:\n"
     },
     {
       "id": "n-c7782c82",
@@ -617,7 +626,8 @@
       "wall_seconds": 31.35,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/parse.py\n+++ b/src/ledger/parse.py\n@@ -5,8 +5,7 @@\n from datetime import date\n from pathlib import Path\n \n-from .rules import THRESHOLD_CENTS, classify\n-\n+from .rules import classify\n \n @dataclass(frozen=True)\n class Transaction:\n"
     }
   ],
   "stats": {

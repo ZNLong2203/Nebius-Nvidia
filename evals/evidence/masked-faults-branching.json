@@ -107,7 +107,8 @@
       "wall_seconds": 6.44,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/parse.py\n+++ b/src/ledger/parse.py\n@@ -5,7 +5,7 @@\n from datetime import date\n from pathlib import Path\n \n-from .rules import THRESHOLD_CENTS, classify\n+from .rules import THRESHOLD, classify\n \n \n @dataclass(frozen=True)\n"
     },
     {
       "id": "n-ec4a365f",
@@ -158,7 +159,8 @@
       "wall_seconds": 16.98,
       "expanded": true,
       "expansions": 1,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/parse.py\n+++ b/src/ledger/parse.py\n@@ -5,8 +5,7 @@\n from datetime import date\n from pathlib import Path\n \n-from .rules import THRESHOLD_CENTS, classify\n-\n+from .rules import classify\n \n @dataclass(frozen=True)\n class Transaction:\n"
     },
     {
       "id": "n-f88e5d4d",
@@ -209,7 +211,8 @@
       "wall_seconds": 51.32,
       "expanded": false,
       "expansions": 0,
-      "note": "applied on retry after: src/ledger/rules.py: the patched file is not valid Python (line 1: invalid syntax). Send the file again, complete and unescaped."
+      "note": "applied on retry after: src/ledger/rules.py: the patched file is not valid Python (line 1: invalid syntax). Send the file again, complete and unescaped.",
+      "diff": "--- a/src/ledger/rules.py\n+++ b/src/ledger/rules.py\n@@ -1,7 +1,7 @@\n \"\"\"Classification rules for ledger entries.\"\"\"\n \n # A transaction is \"large\" at or above five hundred currency units.\n-THRESHOLD = 50_000\n+THRESHOLD_CENTS = 50_000\n \n \n def is_large(amount_cents: int) -> bool:\n@@ -10,7 +10,7 @@\n     The boundary is inclusive: an amount exactly equal to the threshold is\n     large.\n     \"\"\"\n-    return amount_cents > THRESHOLD\n+    return amount_cents > THRESHOLD_CENTS\n \n \n def classify(amount_cents: int) -> str:\n"
     },
     {
       "id": "n-709d244a",
@@ -259,7 +262,8 @@
       "wall_seconds": 18.02,
       "expanded": true,
       "expansions": 1,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/report.py\n+++ b/src/ledger/report.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a transaction dated on the last day of the\n     period belongs to that period.\n     \"\"\"\n-    return [t for t in transactions if start <= t.on < end]\n+    return [t for t in transactions if start <= t.on <= end]\n \n \n def total_cents(transactions: list[Transaction]) -> int:\n"
     },
     {
       "id": "n-53298828",
@@ -308,7 +312,8 @@
       "wall_seconds": 19.03,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/rules.py\n+++ b/src/ledger/rules.py\n@@ -10,7 +10,7 @@\n     The boundary is inclusive: an amount exactly equal to the threshold is\n     large.\n     \"\"\"\n-    return amount_cents > THRESHOLD\n+    return amount_cents >= THRESHOLD\n \n \n def classify(amount_cents: int) -> str:\n"
     },
     {
       "id": "n-4088fed0",
@@ -355,7 +360,8 @@
       "wall_seconds": 9.94,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/ledger/rules.py\n+++ b/src/ledger/rules.py\n@@ -10,7 +10,7 @@\n     The boundary is inclusive: an amount exactly equal to the threshold is\n     large.\n     \"\"\"\n-    return amount_cents > THRESHOLD\n+    return amount_cents >= THRESHOLD\n \n \n def classify(amount_cents: int) -> str:\n"
     }
   ],
   "stats": {

@@ -111,7 +111,8 @@
       "wall_seconds": 20.95,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/billing/proration.py\n+++ b/src/billing/proration.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a subscription that runs from the 1st to the\n     30th is billed for 30 days, not 29.\n     \"\"\"\n-    return (end - start).days\n+    return (end - start).days + 1\n \n \n def prorate(monthly_price: float, start: date, end: date, days_in_month: int = 30) -> float:\n"
     },
     {
       "id": "n-fb57362f",
@@ -160,7 +161,8 @@
       "wall_seconds": 52.09,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/billing/money.py\n+++ b/src/billing/money.py\n@@ -1,17 +1,18 @@\n-\"\"\"Money helpers.\n+'''Money helpers.\n \n Every amount in this package is a float number of currency units, rounded to\n two decimal places at each boundary.\n-\"\"\"\n+'''\n \n+from decimal import Decimal, ROUND_HALF_UP\n \n def round_money(amount: float) -> float:\n-    \"\"\"Round a monetary amount to two decimal places.\n+    '''Round a monetary amount to two decimal places.\n \n     Half-cent amounts must round away from zero, the way an invoice reader\n     expects: 2.675 -> 2.68, not 2.67.\n-    \"\"\"\n-    return round(amount, 2)\n+    '''\n+    return float(Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))\n \n \n def pct(value: float, percent: float) -> float:\n"
     },
     {
       "id": "n-1cb75eb5",
@@ -220,7 +222,8 @@
       "wall_seconds": 73.6,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/billing/invoice.py\n+++ b/src/billing/invoice.py\n@@ -24,13 +24,14 @@\n     tax_pct: float = 0.0,\n     coupon: float = 0.0,\n ) -> float:\n-    \"\"\"Total payable for an invoice.\n+    '''Total payable for an invoice.\n \n     Order of operations matters. A coupon is a reduction of the taxable base,\n     so it comes off the subtotal *before* tax is calculated -- not off the\n     grand total afterwards, which would silently charge the customer tax on\n     money they never paid.\n-    \"\"\"\n+    '''\n     subtotal = round_money(sum(line_total(line) for line in lines))\n-    taxed = subtotal + pct(subtotal, tax_pct)\n-    return round_money(max(0.0, taxed - coupon))\n+    taxable = max(0.0, subtotal - coupon)\n+    taxed = taxable + pct(taxable, tax_pct)\n+    return round_money(taxed)--- a/src/billing/money.py\n+++ b/src/billing/money.py\n@@ -1,17 +1,19 @@\n-\"\"\"Money helpers.\n+'''Money helpers.\n \n Every amount in this package is a float number of currency units, rounded to\n two decimal places at each boundary.\n-\"\"\"\n+'''\n+\n+from decimal import Decimal, ROUND_HALF_UP\n \n \n def round_money(amount: float) -> float:\n-    \"\"\"Round a monetary amount to two decimal places.\n+    '''Round a monetary amount to two decimal places.\n \n     Half-cent amounts must round away from zero, the way an invoice reader\n     expects: 2.675 -> 2.68, not 2.67.\n-    \"\"\"\n-    return round(amount, 2)\n+    '''\n+    return float(Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))\n \n \n def pct(value: float, percent: float) -> float:\n--- a/src/billing/proration.py\n+++ b/src/billing/proration.py\n@@ -6,12 +6,12 @@\n \n \n def billed_days(start: date, end: date) -> int:\n-    \"\"\"Number of days billed for a period.\n+    '''Number of days billed for a period.\n \n     Both endpoints are inclusive: a subscription that runs from the 1st to the\n     30th is billed for 30 days, not 29.\n-    \"\"\"\n-    return (end - start).days\n+    '''\n+    return (end - start).days + 1\n \n \n def prorate(monthly_price: float, start: date, end: date, days_in_month: int = 30) -> float:\n"
     }
   ],
   "stats": {

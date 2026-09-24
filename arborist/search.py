@@ -567,7 +567,9 @@ class Arborist:
                 self._register(node, _NodeState(node, None, parent.files, None))
                 return None
 
-        payload = {p: body.encode("utf-8") for p, body in changed_files(parent.files, patched).items()}
+        changed = changed_files(parent.files, patched)
+        payload = {p: body.encode("utf-8") for p, body in changed.items()}
+        node.diff = unified_diff({p: parent.files.get(p, "") for p in changed}, changed)
 
         if self.settings.branching:
             fork_from = parent.checkpoint

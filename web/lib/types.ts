@@ -45,6 +45,8 @@ export interface SearchNode {
   /** The Tavily query behind this node's diagnosis; absent in older recordings. */
   lookup?: string;
   lookup_evidence?: string;
+  /** What this node changed relative to its parent; absent in older recordings. */
+  diff?: string;
   edits: Edit[];
   explanation: string;
   report: TestReport | null;

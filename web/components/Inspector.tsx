@@ -147,22 +147,6 @@ export function Inspector({
           </div>
         )}
 
-        {node.regressions.length > 0 && (
-          <Collapsible title="Tests it broke" count={node.regressions.length}>
-            <p className="mb-2 max-w-[68ch] text-[12.5px] leading-relaxed text-ink-2">
-              These passed at the parent state. That is what made this branch a dead end — and
-              because nothing was mutated, abandoning it cost nothing.
-            </p>
-            <TestList items={node.regressions} tone="critical" />
-          </Collapsible>
-        )}
-
-        {node.fixed.length > 0 && (
-          <Collapsible title="Tests it fixed" count={node.fixed.length}>
-            <TestList items={node.fixed} tone="good" />
-          </Collapsible>
-        )}
-
         {node.lookup && (
           <div
             className="mb-5 rounded-lg border px-3 py-2.5 text-[12px] leading-relaxed"
@@ -183,25 +167,17 @@ export function Inspector({
           </div>
         )}
 
-        {node.diagnosis && (
-          <Collapsible title="The diagnosis">
-            <p className="max-w-[68ch] text-[13px] leading-relaxed text-ink-2">{node.diagnosis}</p>
-          </Collapsible>
-        )}
-
-        {node.hypothesis?.rationale && (
-          <Collapsible title="Why this theory">
-            <p className="max-w-[68ch] text-[13px] leading-relaxed text-ink-2">{node.hypothesis.rationale}</p>
-          </Collapsible>
-        )}
-
         {node.explanation && (
           <Collapsible title="What the patch does">
             <p className="max-w-[68ch] text-[13px] leading-relaxed text-ink-2">{node.explanation}</p>
           </Collapsible>
         )}
 
-        {node.edits.length > 0 && (
+        {node.diff ? (
+          <Collapsible title="The change" defaultOpen>
+            <UnifiedDiff diff={node.diff} />
+          </Collapsible>
+        ) : node.edits.length > 0 && (
           <Collapsible
             title={node.edits.length === 1 ? "The edit" : "The edits"}
             count={node.edits.length > 1 ? node.edits.length : undefined}
@@ -220,6 +196,34 @@ export function Inspector({
                 ),
               )}
             </div>
+          </Collapsible>
+        )}
+
+        {node.regressions.length > 0 && (
+          <Collapsible title="Tests it broke" count={node.regressions.length}>
+            <p className="mb-2 max-w-[68ch] text-[12.5px] leading-relaxed text-ink-2">
+              These passed at the parent state. That is what made this branch a dead end — and
+              because nothing was mutated, abandoning it cost nothing.
+            </p>
+            <TestList items={node.regressions} tone="critical" />
+          </Collapsible>
+        )}
+
+        {node.fixed.length > 0 && (
+          <Collapsible title="Tests it fixed" count={node.fixed.length}>
+            <TestList items={node.fixed} tone="good" />
+          </Collapsible>
+        )}
+
+        {node.diagnosis && (
+          <Collapsible title="The diagnosis">
+            <p className="max-w-[68ch] text-[13px] leading-relaxed text-ink-2">{node.diagnosis}</p>
+          </Collapsible>
+        )}
+
+        {node.hypothesis?.rationale && (
+          <Collapsible title="Why this theory">
+            <p className="max-w-[68ch] text-[13px] leading-relaxed text-ink-2">{node.hypothesis.rationale}</p>
           </Collapsible>
         )}
 
@@ -303,7 +307,21 @@ function Explainer({ result }: { result: RunResult | null }) {
         </div>
       ) : null}
 
-      <h2 className="text-[15.5px] font-semibold tracking-[-0.01em]">How to read this</h2>
+      {result?.diff && (
+        <div className="mb-7">
+          <h2 className="text-[15.5px] font-semibold tracking-[-0.01em]">
+            {result.solved ? "The fix it found" : "The best branch's change"}
+          </h2>
+          <p className="mt-1 mb-3 text-[12.5px] text-ink-3">
+            {result.solved
+              ? "Everything the winning branch changed, from the starting state to green."
+              : "Everything the best branch changed. The suite is not fully green yet."}
+          </p>
+          <UnifiedDiff diff={result.diff} />
+        </div>
+      )}
+
+      <h2 className="text-[15.5px] font-semibold tracking-[-0.01em]">How to read the tree</h2>
       <p className="mt-2 max-w-[68ch] text-[13px] leading-relaxed text-ink-2">
         Every card is an <strong className="text-ink">immutable repository state</strong>. Moving
         right means a patch was applied <em>on top of</em> the one before it. Cards stacked
@@ -335,12 +353,6 @@ function Explainer({ result }: { result: RunResult | null }) {
         fixed, and the tests it broke.
       </p>
 
-      {result?.diff && (
-        <div className="mt-6">
-          <h3 className="eyebrow mb-2">The resulting patch</h3>
-          <UnifiedDiff diff={result.diff} />
-        </div>
-      )}
     </div>
   );
 }

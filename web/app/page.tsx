@@ -8,6 +8,7 @@ import { CommandBar } from "@/components/CommandBar";
 import { ContextStrip } from "@/components/ContextStrip";
 import { EmptyState } from "@/components/EmptyState";
 import { Inspector } from "@/components/Inspector";
+import { BranchList } from "@/components/BranchList";
 import { SearchTree } from "@/components/SearchTree";
 import { SpendStrip } from "@/components/SpendStrip";
 import { useRun } from "@/lib/useRun";
@@ -82,7 +83,7 @@ export default function Page() {
           details no room at all. */}
       <main className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row lg:overflow-hidden">
         <section
-          className="relative h-[62svh] min-h-[340px] min-w-0 lg:h-auto lg:min-h-[260px] lg:flex-1"
+          className="relative h-[42svh] min-h-[280px] min-w-0 lg:h-auto lg:min-h-[260px] lg:flex-1"
           aria-label="Search tree"
         >
           {hasTree ? (
@@ -97,6 +98,17 @@ export default function Page() {
             <EmptyState running={state.running} />
           )}
         </section>
+
+        {hasTree && (
+          <div className="lg:hidden">
+            <BranchList
+              nodes={shownNodes}
+              winnerId={state.result?.winner_id ?? null}
+              selectedId={selectedId}
+              onSelect={(id) => select(id)}
+            />
+          </div>
+        )}
 
         {/* A third of the width. Code needs the room; the prose inside is
             capped separately so lines stay readable when the screen is wide. */}

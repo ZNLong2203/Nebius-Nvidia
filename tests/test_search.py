@@ -676,3 +676,16 @@ def test_a_lookup_is_recorded_on_the_nodes_it_informed(backend):
     assert child.lookup == "python decimal round half away from zero"
     assert child.lookup_evidence.startswith("Decimal.quantize")
     assert result.nodes[0].lookup == "", "the root was not diagnosed from a lookup"
+
+
+def test_every_evaluated_node_carries_the_diff_it_made(backend):
+    """A whole-file rewrite is how the model asked; the diff is what changed."""
+    result = Arborist(
+        load_settings(backend="local", fanout=1, max_nodes=8, max_depth=5), backend, _scripted_repair_sequence()
+    ).run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
+
+    first = next(n for n in result.nodes if n.depth == 1)
+    assert first.diff.startswith("--- a/src/billing/money.py")
+    assert "+++ b/src/billing/money.py" in first.diff
+    assert "src/billing/invoice.py" not in first.diff, "only this node's own change, not its ancestors'"
+    assert result.nodes[0].diff == "", "the root changed nothing"

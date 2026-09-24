@@ -103,7 +103,8 @@
       "wall_seconds": 41.57,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/_pytest/mark/evaluate.py\n+++ b/src/_pytest/mark/evaluate.py\n@@ -22,12 +22,14 @@\n     default = {}  # type: Dict[str, object]\n     evalcache = config._store.setdefault(evalcache_key, default)\n     try:\n-        return evalcache[expr]\n+        # Use a context-sensitive cache key that includes the expression and a snapshot of the evaluation globals\n+        context_key = (expr, frozenset(d.items()))\n+        return evalcache[context_key]\n     except KeyError:\n         import _pytest._code\n \n         exprcode = _pytest._code.compile(expr, mode=\"eval\")\n-        evalcache[expr] = x = eval(exprcode, d)\n+        evalcache[context_key] = x = eval(exprcode, d)\n         return x\n \n \n"
     },
     {
       "id": "n-873dc754",
@@ -205,7 +206,8 @@
       "wall_seconds": 130.07,
       "expanded": false,
       "expansions": 0,
-      "note": "applied on retry after: src/_pytest/nodes.py: search block not found"
+      "note": "applied on retry after: src/_pytest/nodes.py: search block not found",
+      "diff": "--- a/src/_pytest/mark/evaluate.py\n+++ b/src/_pytest/mark/evaluate.py\n@@ -18,9 +18,9 @@\n evalcache_key = StoreKey[Dict[str, Any]]()\n \n \n-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:\n-    default = {}  # type: Dict[str, object]\n-    evalcache = config._store.setdefault(evalcache_key, default)\n+def cached_eval(item: Item, expr: str, d: Dict[str, object]) -> Any:\n+    # use item's _evalcache, create if not exists\n+    evalcache = getattr(item, \"_evalcache\", {})\n     try:\n         return evalcache[expr]\n     except KeyError:\n@@ -98,7 +98,7 @@\n                     self.expr = expr\n                     if isinstance(expr, str):\n                         d = self._getglobals()\n-                        result = cached_eval(self.item.config, expr, d)\n+                        result = cached_eval(self.item, expr, d)\n                     else:\n                         if \"reason\" not in mark.kwargs:\n                             # XXX better be checked at collection time\n--- a/src/_pytest/nodes.py\n+++ b/src/_pytest/nodes.py\n@@ -623,6 +623,7 @@\n         nodeid: Optional[str] = None,\n     ) -> None:\n         super().__init__(name, parent, config, session, nodeid=nodeid)\n+        self._evalcache = {}\n         self._report_sections = []  # type: List[Tuple[str, str, str]]\n \n         #: user properties is a list of tuples (name, value) that holds user\n"
     }
   ],
   "stats": {

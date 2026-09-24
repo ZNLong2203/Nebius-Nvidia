@@ -115,7 +115,8 @@
       "wall_seconds": 147.24,
       "expanded": true,
       "expansions": 1,
-      "note": "applied on retry after: patch contains no edits"
+      "note": "applied on retry after: patch contains no edits",
+      "diff": "--- a/src/orders/models.py\n+++ b/src/orders/models.py\n@@ -4,7 +4,7 @@\n quantity must be positive, and a discount may not exceed the order total.\n \"\"\"\n \n-from pydantic import BaseModel, root_validator, validator\n+from pydantic import BaseModel, field_validator, model_validator\n \n \n class OrderLine(BaseModel):\n@@ -12,7 +12,7 @@\n     quantity: int\n     unit_price_cents: int\n \n-    @validator(\"quantity\")\n+    @field_validator(\"quantity\", mode='after')\n     def quantity_is_positive(cls, value):\n         if value <= 0:\n             raise ValueError(\"quantity must be positive\")\n@@ -24,7 +24,7 @@\n     lines: list[OrderLine]\n     discount_cents: int = 0\n \n-    @root_validator\n+    @model_validator(mode='after')\n     def discount_within_total(cls, values):\n         lines = values.get(\"lines\") or []\n         gross = sum(line.quantity * line.unit_price_cents for line in lines)\n"
     },
     {
       "id": "n-9ec63a55",
@@ -165,7 +166,8 @@
       "wall_seconds": 22.42,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/orders/models.py\n+++ b/src/orders/models.py\n@@ -25,10 +25,10 @@\n     discount_cents: int = 0\n \n     @model_validator(mode='after')\n-    def discount_within_total(cls, values):\n-        lines = values.get(\"lines\") or []\n+    def discount_within_total(self, values):\n+        lines = self.lines\n         gross = sum(line.quantity * line.unit_price_cents for line in lines)\n-        if values.get(\"discount_cents\", 0) > gross:\n+        if self.discount_cents > gross:\n             raise ValueError(\"discount exceeds the order total\")\n         return values\n \n"
     }
   ],
   "stats": {

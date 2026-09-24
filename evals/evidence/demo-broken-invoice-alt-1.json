@@ -113,7 +113,8 @@
       "wall_seconds": 72.22,
       "expanded": true,
       "expansions": 1,
-      "note": "applied on retry after: src/billing/money.py: search block not found"
+      "note": "applied on retry after: src/billing/money.py: search block not found",
+      "diff": "--- a/src/billing/money.py\n+++ b/src/billing/money.py\n@@ -1,9 +1,10 @@\n-\"\"\"Money helpers.\n+'''Money helpers.\n \n Every amount in this package is a float number of currency units, rounded to\n two decimal places at each boundary.\n-\"\"\"\n+'''\n \n+from decimal import Decimal, ROUND_HALF_UP\n \n def round_money(amount: float) -> float:\n     \"\"\"Round a monetary amount to two decimal places.\n@@ -11,7 +12,7 @@\n     Half-cent amounts must round away from zero, the way an invoice reader\n     expects: 2.675 -> 2.68, not 2.67.\n     \"\"\"\n-    return round(amount, 2)\n+    return float(Decimal(str(amount)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))\n \n \n def pct(value: float, percent: float) -> float:\n"
     },
     {
       "id": "n-66853f3c",
@@ -228,7 +229,8 @@
       "wall_seconds": 16.79,
       "expanded": true,
       "expansions": 1,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/billing/proration.py\n+++ b/src/billing/proration.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a subscription that runs from the 1st to the\n     30th is billed for 30 days, not 29.\n     \"\"\"\n-    return (end - start).days\n+    return (end - start).days + 1\n \n \n def prorate(monthly_price: float, start: date, end: date, days_in_month: int = 30) -> float:\n"
     },
     {
       "id": "n-1394ba22",
@@ -311,7 +313,8 @@
       "wall_seconds": 38.19,
       "expanded": false,
       "expansions": 0,
-      "note": ""
+      "note": "",
+      "diff": "--- a/src/billing/invoice.py\n+++ b/src/billing/invoice.py\n@@ -32,5 +32,6 @@\n     money they never paid.\n     \"\"\"\n     subtotal = round_money(sum(line_total(line) for line in lines))\n-    taxed = subtotal + pct(subtotal, tax_pct)\n-    return round_money(max(0.0, taxed - coupon))\n+    taxable_base = round_money(max(0.0, subtotal - coupon))\n+    tax = pct(taxable_base, tax_pct)\n+    return round_money(taxable_base + tax)\n"
     }
   ],
   "stats": {

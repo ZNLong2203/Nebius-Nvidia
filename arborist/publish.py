@@ -87,7 +87,13 @@ def current_branch(repo: Path) -> str:
 
 
 def is_clean(repo: Path) -> bool:
-    return _git(repo, "status", "--porcelain") == ""
+    """No uncommitted changes to tracked files.
+
+    Untracked files are allowed: a CI job that just ran the tests leaves
+    caches and reports behind, and the commit stages only the patched files,
+    so they cannot end up in it.
+    """
+    return _git(repo, "status", "--porcelain", "--untracked-files=no") == ""
 
 
 def build_plan(

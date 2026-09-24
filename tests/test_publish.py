@@ -147,11 +147,23 @@ def test_the_committed_branch_actually_passes_the_suite(multi_branch_report, dem
 
 
 def test_publish_refuses_a_dirty_working_tree(multi_branch_report, demo_git_repo):
-    (demo_git_repo / "scratch.txt").write_text("uncommitted")
+    (demo_git_repo / "README.md").write_text("an edit nobody committed\n")
     plan = build_plan(multi_branch_report, demo_git_repo)
     with pytest.raises(GitError, match="uncommitted changes"):
         publish(plan)
     assert current_branch(demo_git_repo) == "main"
+
+
+def test_files_a_test_run_leaves_behind_neither_block_nor_join_the_commit(multi_branch_report, demo_git_repo):
+    """In CI the tests have just run: caches and reports are lying around."""
+    (demo_git_repo / ".pytest_cache").mkdir(exist_ok=True)
+    (demo_git_repo / ".pytest_cache" / "left-by-ci").write_text("cache")
+    (demo_git_repo / "report.xml").write_text("<testsuite/>")
+
+    publish(build_plan(multi_branch_report, demo_git_repo))
+
+    committed = _git(demo_git_repo, "show", "--name-only", "--pretty=format:", "HEAD").split()
+    assert committed and not any(f.startswith(".pytest_cache") or f == "report.xml" for f in committed)
 
 
 def test_publish_refuses_a_patch_that_no_longer_applies(multi_branch_report, demo_git_repo):

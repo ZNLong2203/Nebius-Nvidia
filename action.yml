@@ -1,0 +1,141 @@
+name: Arborist
+description: >-
+  When the tests go red, search rival fixes on forked Nebius Sandboxes states
+  with NVIDIA Nemotron, and open a pull request with the one that turns them green.
+author: ZNLong2203
+branding:
+  icon: git-branch
+  color: green
+
+# Use it as the step after your tests, on failure:
+#
+#   - name: Repair with Arborist
+#     if: failure()
+#     uses: ZNLong2203/Nebius-Nvidia@main
+#     with:
+#       nebius-api-key: ${{ secrets.NEBIUS_API_KEY }}
+#       nebius-project-id: ${{ secrets.NEBIUS_PROJECT_ID }}
+#       setup-command: pip install -r requirements.txt
+#
+# The job needs `contents: write` and `pull-requests: write` permissions to
+# push the branch and open the pull request.
+
+inputs:
+  nebius-api-key:
+    description: Nebius Token Factory API key.
+    required: true
+  nebius-project-id:
+    description: Nebius project id; Sandboxes scopes every request to one.
+    required: true
+  tavily-api-key:
+    description: Optional. Lets diagnosis look up third-party documentation.
+    required: false
+    default: ""
+  working-directory:
+    description: The project to repair, relative to the repository root.
+    default: "."
+  test-command:
+    description: The command that must go green, run inside the sandbox.
+    default: python -m pytest -q
+  setup-command:
+    description: Prepares the environment, run once in the sandbox and shared by every branch.
+    default: ""
+  image:
+    description: OCI image the sandbox starts from.
+    default: python:3.12-slim
+  protect:
+    description: Globs no patch may edit, separated by spaces or newlines. Keeps the tests honest.
+    default: "tests/* test_*.py *_test.py"
+  goal:
+    description: Optional. What the repair is for, such as the issue text.
+    default: ""
+  fanout:
+    description: Rival patches per expansion.
+    default: "3"
+  max-nodes:
+    description: Most patches one search may try.
+    default: "12"
+  max-cost:
+    description: Most US dollars one search may spend on models; it stops and keeps its best branch.
+    default: "1.00"
+  open-pull-request:
+    description: Open a pull request when the search turns the tests green.
+    default: "true"
+  base:
+    description: Branch the pull request targets. Defaults to the branch that was tested.
+    default: ""
+  github-token:
+    description: Token used to push the branch and open the pull request.
+    default: ${{ github.token }}
+
+outputs:
+  solved:
+    description: "`true` when the search turned the tests green."
+    value: ${{ steps.search.outputs.solved }}
+  report:
+    description: Path to the run report JSON.
+    value: ${{ steps.search.outputs.report }}
+  pull-request-url:
+    description: The pull request opened, when one was.
+    value: ${{ steps.publish.outputs.url }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+      with:
+        python-version: "3.12"
+
+    - name: Install Arborist
+      shell: bash
+      run: python -m pip install --quiet "$GITHUB_ACTION_PATH"
+
+    - name: Search for a fix on Nebius Sandboxes
+      id: search
+      shell: bash
+      env:
+        NEBIUS_API_KEY: ${{ inputs.nebius-api-key }}
+        NEBIUS_PROJECT_ID: ${{ inputs.nebius-project-id }}
+        TAVILY_API_KEY: ${{ inputs.tavily-api-key }}
+        ARBORIST_BACKEND: contree
+        ARBORIST_MAX_COST: ${{ inputs.max-cost }}
+        WORKDIR: ${{ inputs.working-directory }}
+        TEST_COMMAND: ${{ inputs.test-command }}
+        SETUP_COMMAND: ${{ inputs.setup-command }}
+        IMAGE: ${{ inputs.image }}
+        PROTECT: ${{ inputs.protect }}
+        GOAL: ${{ inputs.goal }}
+        FANOUT: ${{ inputs.fanout }}
+        MAX_NODES: ${{ inputs.max-nodes }}
+      run: |
+        out="$RUNNER_TEMP/arborist"
+        args=(fix "$WORKDIR" --test "$TEST_COMMAND" --image "$IMAGE" -k "$FANOUT" --max-nodes "$MAX_NODES" --out "$out" --quiet)
+        [ -n "$SETUP_COMMAND" ] && args+=(--setup "$SETUP_COMMAND")
+        [ -n "$GOAL" ] && args+=(--goal "$GOAL")
+        # Split on whitespace without letting the shell expand `tests/*` into files.
+        set -f; for glob in $PROTECT; do args+=(--protect "$glob"); done; set +f
+        arborist "${args[@]}"
+
+        report=$(ls -t "$out"/run-*.json | head -1)
+        solved=$(python -c 'import json, sys; print(str(json.load(open(sys.argv[1]))["solved"]).lower())' "$report")
+        echo "report=$report" >> "$GITHUB_OUTPUT"
+        echo "solved=$solved" >> "$GITHUB_OUTPUT"
+        # The job summary shows the search whether or not a pull request follows.
+        arborist report "$report" >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Open the pull request
+      id: publish
+      if: steps.search.outputs.solved == 'true' && inputs.open-pull-request == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        WORKDIR: ${{ inputs.working-directory }}
+        REPORT: ${{ steps.search.outputs.report }}
+        BASE: ${{ inputs.base || github.head_ref || github.ref_name }}
+      run: |
+        git config user.name "arborist[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        arborist pr "$REPORT" --repo "$WORKDIR" --base "$BASE" --open | tee "$RUNNER_TEMP/arborist-pr.log"
+        url=$(grep -oE 'https://github\.com/[^ ]+/pull/[0-9]+' "$RUNNER_TEMP/arborist-pr.log" | tail -1)
+        echo "url=$url" >> "$GITHUB_OUTPUT"
+        [ -n "$url" ] && echo "**Pull request:** $url" >> "$GITHUB_STEP_SUMMARY"

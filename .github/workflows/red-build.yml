@@ -1,0 +1,52 @@
+name: Red build, repaired
+
+# The Arborist action on this repository's own broken example, used the way a
+# project would use it: the tests fail, and the step after them searches for a
+# fix on Nebius Sandboxes and opens a pull request with it.
+#
+# Manual only, since a search spends Token Factory credits (the cap below is
+# $0.50; a broken-invoice search usually costs a few cents). The pull request
+# targets a branch cut from the tested commit, so its diff is the fix alone and
+# main keeps its deliberately broken fixture.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Run the tests
+        working-directory: examples/broken-invoice
+        run: |
+          pip install -q -r requirements.txt
+          python -m pytest -q
+
+      - name: Give the fix a branch to target
+        if: failure()
+        run: |
+          base="demo/red-build-$GITHUB_RUN_ID"
+          git push origin "HEAD:refs/heads/$base"
+          echo "BASE=$base" >> "$GITHUB_ENV"
+
+      - name: Repair with Arborist
+        if: failure()
+        uses: ./
+        with:
+          nebius-api-key: ${{ secrets.NEBIUS_API_KEY }}
+          nebius-project-id: ${{ secrets.NEBIUS_PROJECT_ID }}
+          tavily-api-key: ${{ secrets.TAVILY_API_KEY }}
+          working-directory: examples/broken-invoice
+          setup-command: pip install -q -r requirements.txt
+          base: ${{ env.BASE }}
+          max-cost: "0.50"

@@ -17,6 +17,7 @@ rmSync(out, { recursive: true, force: true });
 mkdirSync(join(out, "runs"), { recursive: true });
 
 let pinned = false;
+const index = [];
 for (const entry of manifest.runs) {
   const run = JSON.parse(readFileSync(join(evidence, entry.file), "utf8"));
   const recorded_at = entry.recorded_at ?? null;
@@ -24,6 +25,7 @@ for (const entry of manifest.runs) {
     join(out, "runs", `${run.run_id}.json`),
     JSON.stringify({ run_id: run.run_id, done: true, error: run.error ?? "", result: run, recorded_at }),
   );
+  index.push({ run_id: run.run_id, title: entry.title ?? entry.file, recorded_at, solved: Boolean(run.solved) });
   if (entry.file === manifest.demo) {
     writeFileSync(
       join(out, "demo.json"),
@@ -33,6 +35,9 @@ for (const entry of manifest.runs) {
   }
   console.log(`bundled ${entry.file} as ?run=${run.run_id}`);
 }
+
+// What the page offers as "recorded runs": every entry, the demo first.
+writeFileSync(join(out, "index.json"), JSON.stringify(index));
 
 if (!pinned) {
   console.error(`manifest.demo (${manifest.demo}) is not among manifest.runs`);

@@ -3,43 +3,43 @@
   "runs": [
     {
       "file": "demo-broken-invoice.json",
-      "title": "broken-invoice on Nebius Sandboxes: rival patches from one checkpoint, two regressions abandoned, green at depth 2",
+      "title": "Demo \u00b7 broken-invoice \u00b7 branching, green at depth 2",
       "recorded_at": 1789992159
     },
     {
-      "file": "demo-broken-invoice-alt-1.json",
-      "title": "broken-invoice on Nebius Sandboxes, second recording: three patches refused before execution, green at depth 3",
-      "recorded_at": 1789992641
-    },
-    {
-      "file": "demo-broken-invoice-alt-2.json",
-      "title": "broken-invoice on Nebius Sandboxes, third recording: green at depth 1",
-      "recorded_at": 1789992271
-    },
-    {
-      "file": "sandboxes-first-run.json",
-      "title": "The first search ever executed on real Nebius Sandboxes",
-      "recorded_at": 1789982918
-    },
-    {
       "file": "masked-faults-branching.json",
-      "title": "masked-faults, branching on Sandboxes: the obvious fix comes back neutral, its sibling does not -- solved",
+      "title": "masked-faults \u00b7 branching \u00b7 solved",
       "recorded_at": 1790014215
     },
     {
       "file": "masked-faults-linear.json",
-      "title": "masked-faults, linear baseline on Sandboxes: twelve patches, setup eleven times, not solved",
+      "title": "masked-faults \u00b7 linear baseline \u00b7 not solved",
       "recorded_at": 1790014215
     },
     {
       "file": "tavily-outside-knowledge.json",
-      "title": "outside-knowledge: diagnosis looks up the Pydantic v2 migration with Tavily, then solves",
+      "title": "outside-knowledge \u00b7 Tavily lookup \u00b7 solved",
       "recorded_at": 1790014215
     },
     {
       "file": "tavily-swebench-pytest-7373.json",
-      "title": "SWE-bench Lite pytest-7373: a Tavily lookup during a real repository repair, resolved and re-verified",
+      "title": "SWE-bench pytest-7373 \u00b7 Tavily lookup \u00b7 resolved",
       "recorded_at": 1790023329
+    },
+    {
+      "file": "demo-broken-invoice-alt-1.json",
+      "title": "broken-invoice \u00b7 second recording \u00b7 green at depth 3",
+      "recorded_at": 1789992641
+    },
+    {
+      "file": "demo-broken-invoice-alt-2.json",
+      "title": "broken-invoice \u00b7 third recording \u00b7 green at depth 1",
+      "recorded_at": 1789992271
+    },
+    {
+      "file": "sandboxes-first-run.json",
+      "title": "The first search ever run on Nebius Sandboxes",
+      "recorded_at": 1789982918
     }
   ]
 }

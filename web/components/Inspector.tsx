@@ -1,5 +1,6 @@
 "use client";
 
+import { loadFailure } from "@/lib/report";
 import { STATUS_META } from "@/lib/tree";
 import type { RunResult, SearchNode } from "@/lib/types";
 import { CodeBlock, DiffBlock, TestOutput } from "./Code";
@@ -19,6 +20,7 @@ export function Inspector({
 
   const meta = STATUS_META[node.status] ?? STATUS_META.running;
   const report = node.report;
+  const unloaded = loadFailure(report, node.stdout_tail);
   const title =
     node.depth === 0 ? "Starting state" : node.hypothesis?.title || node.note || "Candidate patch";
 
@@ -68,7 +70,24 @@ export function Inspector({
           node through the previous one's reading position. */}
       <div key={node.id} className="scroll-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {/* At a glance: the three things worth knowing before any prose. */}
-        {report && (
+        {report && unloaded && (
+          <div className="mb-5 rounded-xl border border-edge bg-surface-2 px-4 py-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[15px] leading-snug font-semibold">The suite did not load</span>
+              <span className="eyebrow">no tests ran</span>
+            </div>
+            <p className="mono mt-2 text-[11.5px] leading-relaxed break-words text-ink-2">{unloaded}</p>
+            {node.regressions.length > 0 && (
+              <div className="mt-3">
+                <Badge tone="critical" icon="↓">
+                  broke {node.regressions.length} that passed before
+                </Badge>
+              </div>
+            )}
+          </div>
+        )}
+
+        {report && !unloaded && (
           <div className="mb-5 rounded-xl border border-edge bg-surface-2 px-4 py-3">
             <div className="flex items-baseline justify-between gap-3">
               <span className="tnum text-[24px] leading-none font-semibold">

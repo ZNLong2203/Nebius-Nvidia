@@ -28,6 +28,13 @@ export default function Page() {
     if (id) url.searchParams.set("node", id);
     else url.searchParams.delete("node");
     window.history.replaceState(null, "", url);
+    // Stacked layout: the details open below the tree, out of sight, so a tap
+    // on a card would otherwise look like it did nothing.
+    if (id && window.matchMedia("(max-width: 1023px)").matches) {
+      requestAnimationFrame(() =>
+        document.getElementById("inspector")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+    }
   }, []);
 
   // Replay only applies to a finished run; a live one is already happening.
@@ -46,11 +53,12 @@ export default function Page() {
   const showActivity = state.activity.length > 0 || state.running;
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col lg:h-dvh">
       <CommandBar
         health={state.health}
         running={state.running}
         stopping={state.stopping}
+        currentRunId={state.result?.run_id ?? null}
         onRun={(request) => {
           select(null);
           start(request);
@@ -67,12 +75,14 @@ export default function Page() {
         error={state.error}
       />
 
-      {/* Stacked below lg, side by side above it. `overflow-hidden` plus
-          `min-h-0` on both children is what stops the panel growing to its
-          content height and pushing through the strip below. */}
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+      {/* Side by side above lg, each panel scrolling on its own inside the
+          viewport. Below it the page scrolls instead: the tree gets most of
+          the screen and the details follow it at their natural height --
+          locking a phone to one screen left the tree a sliver and the
+          details no room at all. */}
+      <main className="flex flex-col lg:min-h-0 lg:flex-1 lg:flex-row lg:overflow-hidden">
         <section
-          className="relative min-h-[260px] min-w-0 flex-1 basis-1/2 lg:basis-auto"
+          className="relative h-[62svh] min-h-[340px] min-w-0 lg:h-auto lg:min-h-[260px] lg:flex-1"
           aria-label="Search tree"
         >
           {hasTree ? (
@@ -90,8 +100,11 @@ export default function Page() {
 
         {/* A third of the width. Code needs the room; the prose inside is
             capped separately so lines stay readable when the screen is wide. */}
-        <aside className="flex min-h-0 w-full flex-1 basis-1/2 flex-col overflow-hidden border-t border-edge bg-surface lg:w-1/3 lg:min-w-[400px] lg:flex-none lg:basis-auto lg:border-t-0 lg:border-l">
-          <div className="min-h-0 flex-1">
+        <aside
+          id="inspector"
+          className="flex w-full scroll-mt-2 flex-col border-t border-edge bg-surface lg:min-h-0 lg:w-1/3 lg:min-w-[400px] lg:flex-none lg:overflow-hidden lg:border-t-0 lg:border-l"
+        >
+          <div className="lg:min-h-0 lg:flex-1">
             <Inspector node={selected} result={state.result} onClose={() => select(null)} />
           </div>
           {showActivity && (

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Health, StartRunRequest } from "@/lib/types";
+import { getRecordings } from "@/lib/api";
+import type { Health, Recording, StartRunRequest } from "@/lib/types";
 
 const FIELD =
   "mono w-full rounded-lg border border-edge bg-plane px-3 py-2 text-[12.5px] text-ink " +
@@ -11,15 +12,21 @@ export function CommandBar({
   health,
   running,
   stopping,
+  currentRunId,
   onRun,
   onStop,
 }: {
   health: Health | null;
   running: boolean;
   stopping: boolean;
+  currentRunId: string | null;
   onRun: (request: StartRunRequest) => void;
   onStop: () => void;
 }) {
+  const [recordings, setRecordings] = useState<Recording[]>([]);
+  useEffect(() => {
+    if (health?.static) getRecordings().then(setRecordings);
+  }, [health?.static]);
   const [repo, setRepo] = useState("examples/broken-invoice");
   const [test, setTest] = useState("python -m pytest -q");
   const [setup, setSetup] = useState("pip install -q -r requirements.txt");
@@ -45,7 +52,7 @@ export function CommandBar({
   const canRun = health ? health.can_run : true;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-edge bg-surface/85 backdrop-blur-xl">
+    <header className="z-30 border-b lg:sticky lg:top-0 border-edge bg-surface/85 backdrop-blur-xl">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-2.5">
           <Mark />
@@ -57,6 +64,32 @@ export function CommandBar({
 
         <div className="hidden h-8 w-px bg-edge lg:block" />
 
+        {health?.static && recordings.length > 0 ? (
+          <div className="flex min-w-0 flex-1 basis-[420px] items-center gap-2">
+            <label className="shrink-0 text-[11.5px] text-ink-3" htmlFor="recording">
+              Recorded run
+            </label>
+            <select
+              id="recording"
+              className="w-full cursor-pointer rounded-lg border border-edge bg-plane px-3 py-2 text-[12.5px] text-ink transition-colors focus:border-accent focus:outline-none"
+              value={currentRunId ?? recordings[0].run_id}
+              onChange={(event) => {
+                // A full navigation: the run is a link, so it can be shared.
+                const url = new URL(window.location.href);
+                url.searchParams.set("run", event.target.value);
+                url.searchParams.delete("node");
+                window.location.assign(url);
+              }}
+            >
+              {recordings.map((recording) => (
+                <option key={recording.run_id} value={recording.run_id}>
+                  {recording.solved ? "✓ " : "✗ "}
+                  {recording.title}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
         <div className="flex min-w-0 flex-1 basis-[420px] items-center gap-2">
           <label className="sr-only" htmlFor="repo">
             Repository path
@@ -80,6 +113,7 @@ export function CommandBar({
             spellCheck={false}
           />
         </div>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           <button

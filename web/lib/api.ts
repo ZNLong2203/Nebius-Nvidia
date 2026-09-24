@@ -1,4 +1,4 @@
-import type { DemoResponse, Health, RunEvent, RunResult, StartRunRequest } from "./types";
+import type { DemoResponse, Health, Recording, RunEvent, RunResult, StartRunRequest } from "./types";
 
 /**
  * In development Next proxies /api to the FastAPI service (see next.config.ts).
@@ -36,6 +36,10 @@ async function get<T>(path: string): Promise<T> {
 
 export const getHealth = () =>
   STATIC_DEMO ? Promise.resolve(STATIC_HEALTH) : get<Health>("/api/health");
+/** The recorded runs a static build ships; empty anywhere else. */
+export const getRecordings = () =>
+  STATIC_DEMO ? get<Recording[]>(`${shipped}/index.json`).catch(() => [] as Recording[]) : Promise.resolve([]);
+
 export const getDemo = () => get<DemoResponse>(STATIC_DEMO ? `${shipped}/demo.json` : "/api/demo");
 export const getRun = (id: string) =>
   get<{ run_id: string; done: boolean; error: string; result: RunResult | null; recorded_at?: number | null }>(

@@ -122,6 +122,14 @@ export interface DemoResponse {
   run: RunResult | null;
 }
 
+/** A recorded run a static build ships, listed for the run picker. */
+export interface Recording {
+  run_id: string;
+  title: string;
+  recorded_at: number | null;
+  solved: boolean;
+}
+
 /** One line of the server-sent event stream. */
 export type RunEvent =
   | { type: "run_started"; at: number; run_id: string; repo: string; test_command: string }

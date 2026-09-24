@@ -1,5 +1,6 @@
 "use client";
 
+import { loadFailure } from "@/lib/report";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { NODE_H, NODE_W, STATUS_META, ancestryIds, layoutTree, winningPathIds } from "@/lib/tree";
 import type { SearchNode } from "@/lib/types";
@@ -138,7 +139,11 @@ export function SearchTree({
                 const fresh = !seen.current.has(node.id);
                 seen.current.add(node.id);
 
-                const passing = node.report ? `${node.report.passed}/${node.report.total}` : "—";
+                const passing = !node.report
+                  ? "—"
+                  : loadFailure(node.report, node.stdout_tail)
+                    ? "no load"
+                    : `${node.report.passed}/${node.report.total}`;
                 const title =
                   node.depth === 0
                     ? "Starting state"

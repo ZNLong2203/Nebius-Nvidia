@@ -24,13 +24,14 @@ def invoice_total(
     tax_pct: float = 0.0,
     coupon: float = 0.0,
 ) -> float:
-    """Total payable for an invoice.
+    '''Total payable for an invoice.
 
     Order of operations matters. A coupon is a reduction of the taxable base,
     so it comes off the subtotal *before* tax is calculated -- not off the
     grand total afterwards, which would silently charge the customer tax on
     money they never paid.
-    """
+    '''
     subtotal = round_money(sum(line_total(line) for line in lines))
-    taxed = subtotal + pct(subtotal, tax_pct)
-    return round_money(max(0.0, taxed - coupon))
+    taxable = max(0.0, subtotal - coupon)
+    taxed = taxable + pct(taxable, tax_pct)
+    return round_money(taxed)

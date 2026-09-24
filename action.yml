@@ -18,7 +18,9 @@ branding:
 #       setup-command: pip install -r requirements.txt
 #
 # The job needs `contents: write` and `pull-requests: write` permissions to
-# push the branch and open the pull request.
+# push the branch and open the pull request, and the repository must allow it:
+# Settings -> Actions -> General -> "Allow GitHub Actions to create and approve
+# pull requests". GitHub leaves that off by default.
 
 inputs:
   nebius-api-key:
@@ -135,7 +137,14 @@ runs:
       run: |
         git config user.name "arborist[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        arborist pr "$REPORT" --repo "$WORKDIR" --base "$BASE" --open | tee "$RUNNER_TEMP/arborist-pr.log"
+        if ! arborist pr "$REPORT" --repo "$WORKDIR" --base "$BASE" --open 2>&1 | tee "$RUNNER_TEMP/arborist-pr.log"; then
+          if grep -q "not permitted to create or approve pull requests" "$RUNNER_TEMP/arborist-pr.log"; then
+            msg="The fix is pushed, but this repository does not let GitHub Actions open pull requests. Enable Settings -> Actions -> General -> \"Allow GitHub Actions to create and approve pull requests\", or open one from the pushed branch."
+            echo "::error::$msg"
+            echo "**$msg**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 1
+        fi
         url=$(grep -oE 'https://github\.com/[^ ]+/pull/[0-9]+' "$RUNNER_TEMP/arborist-pr.log" | tail -1)
         echo "url=$url" >> "$GITHUB_OUTPUT"
         [ -n "$url" ] && echo "**Pull request:** $url" >> "$GITHUB_STEP_SUMMARY"

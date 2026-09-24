@@ -222,6 +222,7 @@ Each one must address a failure that is STILL failing in the output above."""
     # its diagnosis is low. One cheap search is worth less than one wrong patch
     # and the sandbox execution behind it.
     evidence = ""
+    lookup_query = ""
     # Nemotron answers this on a 0-100 scale despite the field being described as
     # a probability, so accept either and normalise.
     raw_confidence = data.get("confidence")
@@ -246,6 +247,7 @@ Each one must address a failure that is STILL failing in the output above."""
             answer, hits = tavily.search(query)
             evidence = tavily.render(answer, hits)
             if evidence:
+                lookup_query = query
                 # Re-run diagnosis once, now with the missing outside knowledge.
                 data = llm.json(
                     "super" if tier == "super" else tier,
@@ -282,6 +284,9 @@ Each one must address a failure that is STILL failing in the output above."""
         "request_files": [str(p) for p in (data.get("request_files") or []) if p],
         "searched": bool(evidence),
         "search_reason": reason if evidence else "",
+        # The query as sent: `search_query` above is re-read from the second
+        # diagnosis, which may not repeat it.
+        "lookup_query": lookup_query,
         "external_package": (data.get("external_package") or "").strip(),
         "search_query": (data.get("search_query") or "").strip(),
         "evidence": evidence[:4000],

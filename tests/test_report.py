@@ -156,3 +156,16 @@ def test_a_rationale_that_thinks_aloud_stays_out_of_the_pull_request():
 
     short = "The coupon is applied after tax."
     assert _concise(short) == short
+
+
+def test_a_regressed_alternative_names_its_broken_tests_in_code_tags(multi_branch_report):
+    """GitHub renders no markdown inside <summary>: backticks would show as backticks."""
+    import copy
+
+    report = copy.deepcopy(multi_branch_report)
+    loser = next(n for n in report["nodes"] if n["depth"] == 1 and n["id"] != report["winner_id"])
+    loser.update(status="regressed", regressions=["tests.test_billing::test_pct<1>"])
+    body = render_pr_body(report)
+    summary = next(line for line in body.splitlines() if line.startswith("<details><summary>") and "broke" in line)
+    assert "<code>tests.test_billing::test_pct&lt;1&gt;</code>" in summary, "names escaped, inside <code>"
+    assert "`" not in summary

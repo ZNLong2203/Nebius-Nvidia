@@ -117,6 +117,10 @@ class Node:
     expanded: bool = False
     expansions: int = 0
     note: str = ""
+    lookup: str = ""
+    """The external-docs query behind this node's diagnosis, when there was one."""
+    lookup_evidence: str = ""
+    """The start of what that lookup returned, as the model was shown it."""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -139,6 +143,8 @@ class Node:
             "expanded": self.expanded,
             "expansions": self.expansions,
             "note": self.note,
+            "lookup": self.lookup,
+            "lookup_evidence": self.lookup_evidence,
         }
 
 

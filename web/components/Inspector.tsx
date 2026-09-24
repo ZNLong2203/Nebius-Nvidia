@@ -7,6 +7,14 @@ import { CodeBlock, DiffBlock, TestOutput } from "./Code";
 import { Collapsible } from "./Collapsible";
 import { Badge, Meter } from "./Primitives";
 
+/** A note worth showing: the root's "baseline" label is bookkeeping, not news. */
+function displayNote(note: string): string {
+  return note
+    .split(" | ")
+    .filter((part) => part.trim() && part.trim() !== "baseline")
+    .join(" · ");
+}
+
 export function Inspector({
   node,
   result,
@@ -124,7 +132,7 @@ export function Inspector({
           </div>
         )}
 
-        {node.note && (
+        {displayNote(node.note) && (
           <div
             className="mb-5 rounded-lg border px-3 py-2.5 text-[12px] leading-relaxed"
             style={{
@@ -132,8 +140,10 @@ export function Inspector({
               background: "color-mix(in srgb, var(--warning) 8%, transparent)",
             }}
           >
-            <span className="eyebrow mb-1 block">Why it stopped here</span>
-            <span className="mono text-ink-2">{node.note}</span>
+            <span className="eyebrow mb-1 block">
+              {node.status === "invalid" ? "Why it never reached the sandbox" : "Worth knowing"}
+            </span>
+            <span className="mono text-ink-2">{displayNote(node.note)}</span>
           </div>
         )}
 
@@ -151,6 +161,26 @@ export function Inspector({
           <Collapsible title="Tests it fixed" count={node.fixed.length}>
             <TestList items={node.fixed} tone="good" />
           </Collapsible>
+        )}
+
+        {node.lookup && (
+          <div
+            className="mb-5 rounded-lg border px-3 py-2.5 text-[12px] leading-relaxed"
+            style={{
+              borderColor: "color-mix(in srgb, var(--accent) 40%, transparent)",
+              background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+            }}
+          >
+            <span className="eyebrow mb-1 block">Looked it up with Tavily</span>
+            <span className="mono text-ink">“{node.lookup}”</span>
+            {node.lookup_evidence && (
+              <p className="mt-2 line-clamp-4 text-ink-2">{node.lookup_evidence}</p>
+            )}
+            <p className="mt-2 text-[11.5px] text-ink-3">
+              The diagnosis needed more than the repository could tell it, so it searched
+              before proposing this fix.
+            </p>
+          </div>
         )}
 
         {node.diagnosis && (
@@ -250,6 +280,29 @@ function TestList({ items, tone }: { items: string[]; tone: string }) {
 function Explainer({ result }: { result: RunResult | null }) {
   return (
     <div className="scroll-thin h-full overflow-y-auto px-5 py-5">
+      {result?.stats?.tavily_queries?.length ? (
+        <div
+          className="mb-5 rounded-lg border px-3 py-2.5 text-[12.5px] leading-relaxed"
+          style={{
+            borderColor: "color-mix(in srgb, var(--accent) 40%, transparent)",
+            background: "color-mix(in srgb, var(--accent) 8%, transparent)",
+          }}
+        >
+          <span className="eyebrow mb-1 block">This search looked outside the repository</span>
+          <p className="text-ink-2">
+            Diagnosis decided the repository alone could not explain the failure, so it
+            searched with Tavily before proposing a fix:
+          </p>
+          <ul className="mt-1.5 space-y-1">
+            {result.stats.tavily_queries.map((query) => (
+              <li key={query} className="mono text-[11.5px] text-ink">
+                “{query}”
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <h2 className="text-[15.5px] font-semibold tracking-[-0.01em]">How to read this</h2>
       <p className="mt-2 max-w-[68ch] text-[13px] leading-relaxed text-ink-2">
         Every card is an <strong className="text-ink">immutable repository state</strong>. Moving

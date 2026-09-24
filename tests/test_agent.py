@@ -91,6 +91,8 @@ def test_diagnose_looks_up_a_named_third_party_package_even_when_confident():
     _, meta = _diagnose(ScriptedLLM(responses={"super": [confident, GOOD]}), tavily=tavily)
     assert tavily.queries == ["pydantic 2 root_validator"]
     assert meta["search_reason"] == "third-party package implicated"
+    # The second diagnosis does not repeat the query; the one sent is kept.
+    assert meta["lookup_query"] == "pydantic 2 root_validator"
 
 
 def test_diagnose_looks_up_when_its_own_confidence_is_low():

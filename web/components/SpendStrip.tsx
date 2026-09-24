@@ -83,6 +83,14 @@ export function SpendStrip({ result }: { result: RunResult | null }) {
             tone="good"
           />
         ) : null}
+        {stats?.tavily_queries?.length ? (
+          <Stat
+            label="Tavily lookups"
+            value={stats.tavily_queries.length}
+            hint="outside the repo"
+            tone="good"
+          />
+        ) : null}
         <Stat
           label="Wall time"
           value={stats?.wall_seconds ? `${Math.round(stats.wall_seconds)}s` : "—"}

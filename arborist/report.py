@@ -13,6 +13,7 @@ test-level reason each one lost.
 
 from __future__ import annotations
 
+import html
 import json
 import re
 from pathlib import Path
@@ -288,7 +289,8 @@ def _render_alternative(node: dict) -> str:
     passing = f"{report_block['passed']}/{report_block['total']}" if report_block else "?"
 
     if node["status"] == "regressed":
-        reason = "broke " + ", ".join(f"`{t}`" for t in node.get("regressions", []))
+        # GitHub renders no markdown inside <summary>, so backticks would show.
+        reason = "broke " + ", ".join(f"<code>{html.escape(t)}</code>" for t in node.get("regressions", []))
     elif node["status"] == "invalid":
         reason = node.get("note") or "patch could not be applied"
     elif node["status"] == "neutral":

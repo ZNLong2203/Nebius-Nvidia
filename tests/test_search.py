@@ -643,3 +643,36 @@ def test_the_expansion_cap_is_a_share_of_the_candidate_cap(backend):
         agent = Arborist(load_settings(backend="local", fanout=fanout), backend, ScriptedLLM(responses={}))
         assert agent._expansion_cap == expansions
         assert agent._expansion_cap * fanout >= MAX_CANDIDATES_PER_NODE
+
+
+def test_a_lookup_is_recorded_on_the_nodes_it_informed(backend):
+    """The tree has to show where Tavily was used, not only that it was."""
+
+    class Tavily:
+        enabled = True
+
+        def __init__(self):
+            self.queries: list[str] = []
+
+        def search(self, query):
+            self.queries.append(query)
+            return "Decimal.quantize with ROUND_HALF_UP rounds half away from zero", []
+
+        @staticmethod
+        def render(answer, hits):
+            return answer
+
+    needs_docs = {
+        **_diagnosis("banker's rounding in round_money", "src/billing/money.py"),
+        "needs_external_docs": True,
+        "search_query": "python decimal round half away from zero",
+    }
+    good = {"explanation": "Decimal rounding", "edits": [{"path": "src/billing/money.py", "new_content": MONEY_FIXED}]}
+    llm = ScriptedLLM(responses={"super": [needs_docs, needs_docs], "nano": [good]})
+    settings = load_settings(backend="local", fanout=1, max_nodes=1, max_depth=1)
+    result = Arborist(settings, backend, llm, Tavily()).run(RunConfig(repo_path=str(EXAMPLE), test_command=PYTEST_CMD))
+
+    child = next(n for n in result.nodes if n.depth == 1)
+    assert child.lookup == "python decimal round half away from zero"
+    assert child.lookup_evidence.startswith("Decimal.quantize")
+    assert result.nodes[0].lookup == "", "the root was not diagnosed from a lookup"

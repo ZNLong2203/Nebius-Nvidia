@@ -494,6 +494,8 @@ class Arborist:
             hypothesis=hypothesis,
             diagnosis=meta.get("root_cause") or hypothesis.rationale,
             model_tier="nano",
+            lookup=meta.get("lookup_query", ""),
+            lookup_evidence=(meta.get("evidence") or "")[:600] if meta.get("lookup_query") else "",
         )
         started = time.time()
 

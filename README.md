@@ -108,14 +108,27 @@ All three are served through **Nebius Token Factory**'s OpenAI-compatible endpoi
 
 Python 3.11 or newer.
 
+**Just the tool**, on your own repository:
+
+```bash
+pipx install git+https://github.com/ZNLong2203/Nebius-Nvidia.git
+export NEBIUS_API_KEY=... NEBIUS_PROJECT_ID=...     # or put them in a .env file
+cd path/to/your/repo
+arborist fix . --setup "pip install -r requirements.txt" --protect "tests/*"
+```
+
+`arborist serve` opens the interface on a recorded search, even with no key set.
+
+**The whole project**, with the test suite:
+
 ```bash
 git clone https://github.com/ZNLong2203/Nebius-Nvidia.git
 cd Nebius-Nvidia
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[contree,dev]"
+pip install -e ".[dev]"
 
 cp .env.example .env     # add NEBIUS_API_KEY (and TAVILY_API_KEY if you have one)
-pytest -q                # 168 tests, no key needed — everything runs offline
+pytest -q                # 173 tests, no key needed — everything runs offline
 ```
 
 Get a key at [tokenfactory.nebius.com](https://tokenfactory.nebius.com). Hackathon participants get $25 in credits with the code `NEBIUS-DEVPOST-GLOBAL26`.
@@ -307,7 +320,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 
 ### Two backends, one contract
 
-`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 168 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
+`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 173 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
 
 ---
 
@@ -317,7 +330,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 pytest -q
 ```
 
-168 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
+173 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
 
 CI runs them on Python 3.11, 3.12 and 3.13, fails the build below 80% line coverage (86% today), runs the interface's unit tests with `npm test` in `web/`, and checks that every bundled fixture is still broken.
 

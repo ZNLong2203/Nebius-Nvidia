@@ -14,10 +14,13 @@ dependencies = [
   "python-dotenv>=1.0",
   "rich>=13.7",
   "typer>=0.12",
+  # Nebius Sandboxes is the default backend, so it is not optional.
+  "contree-sdk==0.3.6",
 ]
 
 [project.optional-dependencies]
-contree = ["contree-sdk==0.3.6"]
+# Kept so `pip install -e ".[contree,dev]"` in older instructions still works.
+contree = []
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov>=5.0", "ruff>=0.6"]
 
 [project.scripts]
@@ -29,6 +32,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["arborist"]
+
+# An install from git or a wheel has no checkout around it, so the fallback
+# interface and the recorded runs travel inside the package: `arborist serve`
+# then opens on a real search wherever it was installed from.
+[tool.hatch.build.targets.wheel.force-include]
+"ui/index.html" = "arborist/_bundled/ui/index.html"
+"evals/evidence" = "arborist/_bundled/evidence"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

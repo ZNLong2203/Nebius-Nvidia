@@ -28,7 +28,10 @@ from .search import Arborist, RunConfig, write_report
 from .tools.tavily import TavilyClient
 
 ROOT = Path(__file__).resolve().parents[1]
-UI_DIR = ROOT / "ui"
+# Installed from a wheel there is no checkout around the package; the build
+# bundles the fallback UI and the recorded runs inside it instead.
+BUNDLED = Path(__file__).resolve().parent / "_bundled"
+UI_DIR = ROOT / "ui" if (ROOT / "ui" / "index.html").is_file() else BUNDLED / "ui"
 WEB_DIR = ROOT / "web" / "out"
 
 app = FastAPI(title="Arborist", version="0.1.0")
@@ -39,7 +42,7 @@ def _runs_dir() -> Path:
 
 
 # Curated, checked-in runs: what the README cites and the static build replays.
-EVIDENCE_DIR = Path(__file__).resolve().parents[1] / "evals" / "evidence"
+EVIDENCE_DIR = ROOT / "evals" / "evidence" if (ROOT / "evals" / "evidence").is_dir() else BUNDLED / "evidence"
 
 
 def _evidence_demo() -> dict | None:

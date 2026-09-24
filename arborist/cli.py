@@ -34,7 +34,7 @@ STATUS_STYLE = {
 }
 
 
-@app.command()
+@app.command(help="Repair a failing repository: search rival patches on forked sandbox states until the tests pass.")
 def fix(
     repo: Path = typer.Argument(..., help="Path to the repository to repair."),
     test_command: str = typer.Option("python -m pytest -q", "--test", "-t", help="Command that must go green."),
@@ -70,7 +70,11 @@ def fix(
         goal = Path(goal[1:]).read_text(encoding="utf-8")
 
     if not settings.has_llm:
-        console.print("[red]NEBIUS_API_KEY is not set.[/] Copy .env.example to .env and add your key.")
+        console.print(
+            "[red]NEBIUS_API_KEY is not set.[/] Get a key at https://tokenfactory.nebius.com, then either\n"
+            "  export NEBIUS_API_KEY=... NEBIUS_PROJECT_ID=...\n"
+            "or put both in a .env file in the directory you run arborist from."
+        )
         raise typer.Exit(code=2)
 
     llm = NemotronClient(settings)

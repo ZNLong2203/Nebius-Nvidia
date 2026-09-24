@@ -117,7 +117,12 @@ export default function Page() {
           className="flex w-full scroll-mt-2 flex-col border-t border-edge bg-surface lg:min-h-0 lg:w-1/3 lg:min-w-[400px] lg:flex-none lg:overflow-hidden lg:border-t-0 lg:border-l"
         >
           <div className="lg:min-h-0 lg:flex-1">
-            <Inspector node={selected} result={state.result} onClose={() => select(null)} />
+            <Inspector
+              node={selected}
+              result={state.result}
+              replaying={replayable && replay.cursor < replay.total}
+              onClose={() => select(null)}
+            />
           </div>
           {showActivity && (
             <div className="h-[34%] max-h-[280px] min-h-[160px] shrink-0 border-t border-edge">

@@ -19,12 +19,15 @@ export function Inspector({
   node,
   result,
   onClose,
+  replaying = false,
 }: {
   node: SearchNode | null;
   result: RunResult | null;
   onClose: () => void;
+  /** A replay is part way through: the answer would spoil it. */
+  replaying?: boolean;
 }) {
-  if (!node) return <Explainer result={result} />;
+  if (!node) return <Explainer result={result} replaying={replaying} />;
 
   const meta = STATUS_META[node.status] ?? STATUS_META.running;
   const report = node.report;
@@ -281,7 +284,7 @@ function TestList({ items, tone }: { items: string[]; tone: string }) {
 }
 
 /** Shown when nothing is selected: teach the mental model rather than sit blank. */
-function Explainer({ result }: { result: RunResult | null }) {
+function Explainer({ result, replaying }: { result: RunResult | null; replaying: boolean }) {
   return (
     <div className="scroll-thin h-full overflow-y-auto px-5 py-5">
       {result?.stats?.tavily_queries?.length ? (
@@ -307,7 +310,7 @@ function Explainer({ result }: { result: RunResult | null }) {
         </div>
       ) : null}
 
-      {result?.diff && (
+      {result?.diff && !replaying && (
         <div className="mb-7">
           <h2 className="text-[15.5px] font-semibold tracking-[-0.01em]">
             {result.solved ? "The fix it found" : "The best branch's change"}

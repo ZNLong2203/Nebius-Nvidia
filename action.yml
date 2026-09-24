@@ -116,7 +116,14 @@ runs:
         [ -n "$GOAL" ] && args+=(--goal "$GOAL")
         # Split on whitespace without letting the shell expand `tests/*` into files.
         set -f; for glob in $PROTECT; do args+=(--protect "$glob"); done; set +f
-        arborist "${args[@]}"
+        # `arborist fix` exits 1 when the suite is not fully green. Here that is
+        # an outcome to report, not a failure of this step.
+        status=0
+        arborist "${args[@]}" || status=$?
+        if [ "$status" -gt 1 ] || ! ls "$out"/run-*.json > /dev/null 2>&1; then
+          echo "::error::arborist fix failed before it could report (exit $status)"
+          exit "$status"
+        fi
 
         report=$(ls -t "$out"/run-*.json | head -1)
         solved=$(python -c 'import json, sys; print(str(json.load(open(sys.argv[1]))["solved"]).lower())' "$report")
@@ -124,6 +131,9 @@ runs:
         echo "solved=$solved" >> "$GITHUB_OUTPUT"
         # The job summary shows the search whether or not a pull request follows.
         arborist report "$report" >> "$GITHUB_STEP_SUMMARY"
+        if [ "$solved" != "true" ]; then
+          echo "::warning::Arborist did not get the suite fully green within its budget. The best branch is in the job summary; no pull request was opened."
+        fi
 
     - name: Open the pull request
       id: publish

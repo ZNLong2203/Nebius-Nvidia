@@ -32,5 +32,6 @@ def invoice_total(
     money they never paid.
     """
     subtotal = round_money(sum(line_total(line) for line in lines))
-    taxed = subtotal + pct(subtotal, tax_pct)
-    return round_money(max(0.0, taxed - coupon))
+    taxable = max(0.0, subtotal - coupon)
+    taxed = taxable + pct(taxable, tax_pct)
+    return round_money(taxed)

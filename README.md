@@ -165,6 +165,28 @@ the code was fixed, not the tests rewritten to agree with it. It is how the
 [SWE-bench runs](evals/swebench/README.md) keep the benchmark's tests as the
 judge.
 
+### In CI: a red build answered with a pull request
+
+Add one step after your tests. When they fail, Arborist searches for a fix on
+Nebius Sandboxes and opens a pull request with the branch that turned them green:
+
+```yaml
+- name: Repair with Arborist
+  if: failure()
+  uses: ZNLong2203/Nebius-Nvidia@main
+  with:
+    nebius-api-key: ${{ secrets.NEBIUS_API_KEY }}
+    nebius-project-id: ${{ secrets.NEBIUS_PROJECT_ID }}
+    setup-command: pip install -r requirements.txt
+```
+
+The job needs `contents: write` and `pull-requests: write`, and the repository
+must allow Actions to open pull requests (*Settings → Actions → General*). Tests
+are protected from edits by default, each search is capped at $1, and the job
+summary shows the search whether or not it opened a pull request. Every input is
+documented in [`action.yml`](action.yml); [`red-build.yml`](.github/workflows/red-build.yml)
+runs it on this repository's own broken example.
+
 ### Watch it search
 
 ```bash

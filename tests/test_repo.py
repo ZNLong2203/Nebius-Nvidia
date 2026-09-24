@@ -393,3 +393,40 @@ def test_a_wanted_dotfile_is_found():
     files = {".coveragerc": "[run]\n", "coveragerc": "decoy\n"}
     assert list(select_context(files, [".coveragerc"], fill=False)) == [".coveragerc"]
 
+
+
+MULTILINE = '''"""Money helpers.
+
+Every amount is rounded to two decimal places.
+"""
+
+
+def round_money(amount):
+    """Round to two places.
+
+    Half-cents round away from zero.
+    """
+    return round(amount, 2)
+'''
+
+
+def test_a_quote_swap_on_multi_line_docstrings_is_undone():
+    """Opening and closing quotes sit in different regions; neither reverts alone.
+
+    The first version of the minimiser only handled one-line docstrings, and the
+    first pull request the GitHub Action opened showed every docstring requoted.
+    """
+    rewrite = MULTILINE.replace('"""', "'''").replace(
+        "    return round(amount, 2)\n", "    return float(Decimal(str(amount)).quantize(Decimal('0.01')))\n"
+    )
+    out = apply_edits({"money.py": MULTILINE}, [Edit(path="money.py", new_content=rewrite)])
+    assert _changed_lines(MULTILINE, out["money.py"]) == [
+        "-    return round(amount, 2)",
+        "+    return float(Decimal(str(amount)).quantize(Decimal('0.01')))",
+    ]
+
+
+def test_a_docstring_whose_words_changed_keeps_its_new_words():
+    rewrite = MULTILINE.replace("Half-cents round away from zero.", "Half-cents round up.")
+    out = apply_edits({"money.py": MULTILINE}, [Edit(path="money.py", new_content=rewrite)])
+    assert "Half-cents round up." in out["money.py"]

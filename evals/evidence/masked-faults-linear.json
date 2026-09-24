@@ -575,7 +575,7 @@
       "expanded": false,
       "expansions": 0,
       "note": "",
-      "diff": "--- a/src/ledger/report.py\n+++ b/src/ledger/report.py\n@@ -6,12 +6,12 @@\n \n \n def in_period(transactions: list[Transaction], start: date, end: date) -> list[Transaction]:\n-    \"\"\"Transactions falling in a reporting period.\n+    '''Transactions falling in a reporting period.\n \n     Both endpoints are inclusive: a transaction dated on the last day of the\n     period belongs to that period.\n-    \"\"\"\n-    return [t for t in transactions if start <= t.on < end]\n+    '''\n+    return [t for t in transactions if start <= t.on <= end]\n \n \n def total_cents(transactions: list[Transaction]) -> int:\n"
+      "diff": "--- a/src/ledger/report.py\n+++ b/src/ledger/report.py\n@@ -11,7 +11,7 @@\n     Both endpoints are inclusive: a transaction dated on the last day of the\n     period belongs to that period.\n     \"\"\"\n-    return [t for t in transactions if start <= t.on < end]\n+    return [t for t in transactions if start <= t.on <= end]\n \n \n def total_cents(transactions: list[Transaction]) -> int:\n"
     },
     {
       "id": "n-c7782c82",

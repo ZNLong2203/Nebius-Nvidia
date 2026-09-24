@@ -366,7 +366,7 @@
       "expanded": false,
       "expansions": 0,
       "note": "applied on retry after: src/billing/invoice.py: the patched file is not valid Python (line 39: unterminated triple-quoted string literal (detected at line 39)). Send the file again, complete and unescaped.",
-      "diff": "--- a/src/billing/invoice.py\n+++ b/src/billing/invoice.py\n@@ -24,13 +24,14 @@\n     tax_pct: float = 0.0,\n     coupon: float = 0.0,\n ) -> float:\n-    \"\"\"Total payable for an invoice.\n+    '''Total payable for an invoice.\n \n     Order of operations matters. A coupon is a reduction of the taxable base,\n     so it comes off the subtotal *before* tax is calculated -- not off the\n     grand total afterwards, which would silently charge the customer tax on\n     money they never paid.\n-    \"\"\"\n+    '''\n     subtotal = round_money(sum(line_total(line) for line in lines))\n-    taxed = subtotal + pct(subtotal, tax_pct)\n-    return round_money(max(0.0, taxed - coupon))\n+    taxable_base = max(0.0, subtotal - coupon)\n+    tax = pct(taxable_base, tax_pct)\n+    return round_money(taxable_base + tax)\n"
+      "diff": "--- a/src/billing/invoice.py\n+++ b/src/billing/invoice.py\n@@ -32,5 +32,6 @@\n     money they never paid.\n     \"\"\"\n     subtotal = round_money(sum(line_total(line) for line in lines))\n-    taxed = subtotal + pct(subtotal, tax_pct)\n-    return round_money(max(0.0, taxed - coupon))\n+    taxable_base = max(0.0, subtotal - coupon)\n+    tax = pct(taxable_base, tax_pct)\n+    return round_money(taxable_base + tax)\n"
     }
   ],
   "stats": {

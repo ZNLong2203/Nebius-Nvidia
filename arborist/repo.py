@@ -230,6 +230,17 @@ def minimise_rewrite(path: str, before: str, after: str) -> str:
     except (SyntaxError, ValueError, tokenize.TokenError):
         return after  # the syntax gate will say why
 
+    # Quotes first. A multi-line docstring's opening and closing quotes land in
+    # different changed regions, and reverting either one alone does not parse,
+    # so the region pass below cannot undo a quote swap by itself.
+    requoted = _restore_string_spelling(before, after)
+    if requoted != after:
+        try:
+            if _fingerprint(requoted) == target:
+                after = requoted
+        except (SyntaxError, ValueError, tokenize.TokenError):
+            pass
+
     old = before.splitlines(keepends=True)
     current = after.splitlines(keepends=True)
     opcodes = difflib.SequenceMatcher(a=old, b=current, autojunk=False).get_opcodes()
@@ -244,6 +255,57 @@ def minimise_rewrite(path: str, before: str, after: str) -> str:
         except (SyntaxError, ValueError, tokenize.TokenError):
             continue
     return "".join(current)
+
+
+def _restore_string_spelling(before: str, after: str) -> str:
+    """Give each string literal in ``after`` its spelling in ``before`` when the value is the same.
+
+    Token streams are aligned with string literals compared by value, so a
+    docstring whose triple quotes were swapped still matches the original;
+    where it does and only the spelling differs, the original spelling is put
+    back. Nothing else is touched.
+    """
+    try:
+        old_tokens = list(tokenize.generate_tokens(io.StringIO(before).readline))
+        new_tokens = list(tokenize.generate_tokens(io.StringIO(after).readline))
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        return after
+
+    def key(token: tokenize.TokenInfo) -> tuple[int, str]:
+        if token.type == tokenize.STRING:
+            try:
+                return token.type, repr(ast.literal_eval(token.string))
+            except (ValueError, SyntaxError):
+                return token.type, token.string
+        if token.type in (tokenize.NL, tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT):
+            return token.type, ""
+        return token.type, token.string
+
+    matcher = difflib.SequenceMatcher(
+        a=[key(t) for t in old_tokens], b=[key(t) for t in new_tokens], autojunk=False
+    )
+    swaps: list[tuple[tuple[int, int], tuple[int, int], str]] = []
+    for tag, i1, _i2, j1, j2 in matcher.get_opcodes():
+        if tag != "equal":
+            continue
+        for step in range(j2 - j1):
+            original, rewritten = old_tokens[i1 + step], new_tokens[j1 + step]
+            if rewritten.type == tokenize.STRING and original.string != rewritten.string:
+                swaps.append((rewritten.start, rewritten.end, original.string))
+    if not swaps:
+        return after
+
+    starts = [0]
+    for line in after.splitlines(keepends=True):
+        starts.append(starts[-1] + len(line))
+
+    def offset(position: tuple[int, int]) -> int:
+        return starts[position[0] - 1] + position[1]
+
+    out = after
+    for start, end, text in sorted(swaps, key=lambda swap: swap[0], reverse=True):
+        out = out[: offset(start)] + text + out[offset(end) :]
+    return out
 
 
 def _fingerprint(source: str) -> tuple[str, tuple[str, ...]]:

@@ -17,7 +17,7 @@ uv venv .venv -p 3.12 && uv pip install -e ".[contree,dev]"
 ## Tests
 
 ```bash
-pytest -q          # 131 tests, no network, no credentials
+pytest -q          # 182 tests, no network, no credentials
 ruff check .
 ```
 

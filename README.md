@@ -55,21 +55,22 @@ Nebius Sandboxes gives every executed command a new, immutable filesystem versio
 
 ## What it produces
 
-Not just a patch — **a patch plus the record of what was rejected and why**, opened as a pull request:
+Not just a patch — **a patch plus the record of what was rejected and why**, opened as a pull request. From [the real one](https://github.com/ZNLong2203/Nebius-Nvidia/pull/1) the demo run produced:
 
 ```
-fix: round_money uses banker's rounding + 2 more (4 failing tests)
+fix: Apply coupon before tax in invoice_total + 1 more (4 failing tests)
 
 Repairs the failing suite: 5/9 → 9/9 passing.
 
-## Alternatives considered (2)
-▸ → pct() loses precision before rounding — no test changed state
-▸ ✗ the test encodes the wrong expectation — tests/test_billing.py: search block not found
+## Alternatives considered (3)
+▸ ↓ Implement round half away from zero in round_money — broke 3 tests that passed before
+▸ ↓ Fix billed_days to be inclusive — broke 5 tests that passed before
+▸ ↑ billed_days calculates exclusive day count instead of inclusive — reached 8/9, did not get to green
 ```
 
-Every branch the search explored is in that body, folded away but present, with the test-level reason it lost. A reviewer can see that the agent *considered* weakening the assertion and why that attempt was thrown out. No coding agent ships that today, and it is the difference between trusting a diff and being able to check one.
+Every branch the search explored is in that body, folded away but present, with the test-level reason it lost — a right theory implemented badly is told apart from a wrong theory, test by test. Most coding agents hand over only the final diff; this is the difference between trusting a diff and being able to check one.
 
-**A real one: [pull request #1](https://github.com/ZNLong2203/Nebius-Nvidia/pull/1)**, opened by `arborist pr` from the demo run above. Three files, six lines added, four removed — the three fixes and nothing else — and under *Alternatives considered*, the two branches that broke passing tests, each with the tests it broke. It targets a `demo/` branch so the fixture stays broken on `main`.
+The diff itself is three files, six lines added, four removed: the three fixes and nothing else. **[Pull request #4](https://github.com/ZNLong2203/Nebius-Nvidia/pull/4)** was opened the other way — by `github-actions[bot]`, from a red CI build, with no one at the keyboard (see *In CI* below). Both target `demo/` branches so the fixture stays broken on `main`.
 
 ---
 
@@ -128,7 +129,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 cp .env.example .env     # add NEBIUS_API_KEY (and TAVILY_API_KEY if you have one)
-pytest -q                # 173 tests, no key needed — everything runs offline
+pytest -q                # 182 tests, no key needed — everything runs offline
 ```
 
 Get a key at [tokenfactory.nebius.com](https://tokenfactory.nebius.com). Hackathon participants get $25 in credits with the code `NEBIUS-DEVPOST-GLOBAL26`.
@@ -185,7 +186,8 @@ must allow Actions to open pull requests (*Settings → Actions → General*). T
 are protected from edits by default, each search is capped at $1, and the job
 summary shows the search whether or not it opened a pull request. Every input is
 documented in [`action.yml`](action.yml); [`red-build.yml`](.github/workflows/red-build.yml)
-runs it on this repository's own broken example.
+runs it on this repository's own broken example, and
+[pull request #4](https://github.com/ZNLong2203/Nebius-Nvidia/pull/4) is what it opened.
 
 ### Watch it search
 
@@ -324,8 +326,11 @@ arborist/
   tools/tavily.py external-knowledge lookup
   server.py       HTTP API + SSE event stream
   cli.py          terminal interface
+  publish.py      branch, commit, push and open the pull request
 web/              the interface: Next.js, exported to static files
 ui/index.html     dependency-free fallback UI (no build step, no CDN)
+action.yml        the GitHub Action: a red build answered with a pull request
+evals/            the measurements, the SWE-bench harness, and the evidence runs
 ```
 
 The loop, once per iteration:
@@ -342,7 +347,7 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 
 ### Two backends, one contract
 
-`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 173 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
+`LocalBackend` implements the same four operations with directory snapshots. It has no isolation and no credentials, and it exists so the search, the scoring, the patch validation and the whole test suite can be exercised offline — which is how the 182 tests in this repo run without touching Nebius. `ContreeBackend` is the real one.
 
 ---
 
@@ -352,9 +357,9 @@ Scoring uses JUnit XML rather than scraping stdout, so `fixed` and `broke` are l
 pytest -q
 ```
 
-173 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
+182 tests, no network and no credentials required: a scripted model stands in for Nemotron and `LocalBackend` for Sandboxes, so the selection, scoring, patch validation, backtracking, API and CLI all genuinely execute. The end-to-end case repairs all three bugs in `examples/broken-invoice` at depth 3 and asserts the agent never edited the tests.
 
-CI runs them on Python 3.11, 3.12 and 3.13, fails the build below 80% line coverage (86% today), runs the interface's unit tests with `npm test` in `web/`, and checks that every bundled fixture is still broken.
+CI runs them on Python 3.11, 3.12 and 3.13, fails the build below 80% line coverage (88% today), runs the interface's unit tests with `npm test` in `web/`, and checks that every bundled fixture is still broken.
 
 ---
 
@@ -366,7 +371,7 @@ Where Arborist is today, and where it goes next:
 - **Breadth is only as good as the hypotheses.** The diagnosis prompt demands distinct theories and feeds back what each branch already tried, so siblings stay genuinely different.
 - **The suite is the oracle.** A bug with no failing test is invisible, and a weak suite can be satisfied by a bad patch — which is why Ultra is asked to flag suite-gaming rather than trusting the score outright.
 - **Sandboxes is in Beta, and access is granted per project.** The backend preflights for it and says so up front; transient API errors are retried, and anything that still fails costs one branch, never the run.
-- **Pull requests are opened from the CLI.** `arborist pr` branches, commits, pushes and calls `gh`. Next: a GitHub App, so a red build wakes the agent up by itself.
+- **Pull requests come from the CLI or from CI.** `arborist pr` opens one by hand; the GitHub Action opens one from a red build. Next: a GitHub App, so every repository in an organisation gets it without adding a step.
 
 ## Documentation
 

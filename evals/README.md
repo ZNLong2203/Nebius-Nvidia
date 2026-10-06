@@ -55,7 +55,7 @@ anything. Guard against it by making the *obvious* fix insufficient.
 
 Three independent bugs in three files (see [`../examples/README.md`](../examples/README.md)).
 No single edit fixes all three and none masks another, so the search must keep a
-partial repair and build on it. Green is reached at depth 3.
+partial repair and build on it. The recorded searches reach green at depth 1 to 3.
 
 ### `regression-trap` — backtracking
 
@@ -66,14 +66,13 @@ A bounded TTL cache with two red tests whose obvious fixes fight each other.
   *that* is to refresh the timestamp on read — which makes entries look young
   forever and destroys expiry.
 
-Each fix in isolation looks like progress and the second undoes the first — that
-was the intent.
+Each fix in isolation looks like progress and the second undoes the first.
 
-**It does not work.** Run against Nemotron 3, both the branching search and the
-linear baseline repair it, the baseline in a single patch. The model does not
-take the bait, so the case measures nothing about search. A case that one patch
-solves cannot, and the same is true of the other two. Replacing them with a case
-where the second fault is invisible until the first is repaired is open work.
+**It is the control case.** Nemotron 3 sees through the trap and both arms repair
+it, the linear baseline in a single patch — which is what makes it useful: it
+shows that branching costs nothing on a bug one good patch can fix. The case
+that needs a search, a second fault invisible until the first is repaired, is
+`masked-faults` below.
 
 ### `masked-faults` — a case one patch cannot solve
 

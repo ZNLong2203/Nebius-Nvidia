@@ -27,3 +27,4 @@ evals/swebench/.cache/
 evals/swebench/reports/
 web/public/demo/
 .coverage
+uv.lock

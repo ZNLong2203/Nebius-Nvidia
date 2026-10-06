@@ -18,7 +18,6 @@ named by `demo` is what the page opens on, and every entry is reachable at
 | `masked-faults-linear.json` | The same case, linear baseline, same budget: twelve patches, setup run eleven times, not solved | 21 Sep 2026 |
 | `tavily-outside-knowledge.json` | A runtime Tavily call: diagnosis attributes the failure to Pydantic v2, looks up the migration, and the next patch solves it | 21 Sep 2026 |
 | `tavily-swebench-pytest-7373.json` | A Tavily call during a **real** repository repair — SWE-bench Lite `pytest-7373`, resolved and independently re-verified | 21 Sep 2026 |
-| `sandboxes-first-run.json` | The first search ever executed on real Sandboxes, before rewrite minimisation existed — its diff shows the quote-restyling noise that motivated it | 21 Sep 2026 |
 
 **How the demo was chosen.** The three `demo-*` files are every recording made
 for it, not a selection from more. All three solved. The one the page opens on
